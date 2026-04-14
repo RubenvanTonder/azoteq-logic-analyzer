@@ -4,7 +4,11 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <pico/stdlib.h>
 #include <stdlib.h>
+#include "pico/bootrom.h"
+#include <string.h>
+
 
 #include "pico/stdlib.h"
 #include "pico/bootrom.h"
@@ -136,7 +140,7 @@ int process_char(sr_device_t *d, char charin)
             Dprintf("Entering Bootsel mode\n\r");
             sleep_ms(1000);
             //reset with inputs per cold boot
-            rom_reset_usb_boot(0,0);
+            reset_usb_boot(0,0);
          }else{
             Dprintf("Invald bootsel command - enter \"bootsel\"\n\r");
          }

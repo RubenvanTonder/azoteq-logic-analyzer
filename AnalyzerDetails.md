@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Need to custromize for azoteq hardware
+=======
+# NEed to customize readme
+>>>>>>> cfa0c5d8b5fab848da7e9f41bcda74d5270f6972
 
 Running sigrok cli or pulseview at debug level 2 is highly recommended to see reported issues with user configurations.
 

@@ -17,7 +17,7 @@ pico_enable_stdio_uart(pico_sdk_pgen 1)
 pico_add_extra_outputs(pico_sdk_pgen)
 
 target_link_libraries(
-    pico_sdk_pgen 
+    pico_sdk_pgen
     pico_stdlib
 
 )
