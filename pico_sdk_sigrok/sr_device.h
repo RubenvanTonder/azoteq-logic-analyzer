@@ -6,7 +6,7 @@
 // Pin usages
 ///////////////////////////////////
 // Baseline mode -21 digital, 3 analog
-// GP0,1 is debug uart TX, RX (but rx not used) 
+// GP0,1 is debug uart TX, RX (but rx not used)
 // GP2-GP22 are digital inputs
 // GP23 controls power supply modes and is not a board I/O
 // GP24 is a power sense and not a board I/O
@@ -27,7 +27,7 @@
 // Note: In the wireless versions, GPIO23-25 control the wifi chip, 23 and 24
 //aren't available in the PICO, and 25 controls the LED. So while the LED is lost,
 //there is no change in available channels for sampling.
-#define PICO_MODE 2 //0 is baseline, 1 is digital 26, 2 is digital 32
+#define PICO_MODE 0 //0 is baseline, 1 is digital 26, 2 is digital 32
 //WARNING: USE PIN_TEST_MODE with extreme caution!!!!
 //If set, treat the inputs (A&D) to be outputs so that the device can drive values for
 //turn-on testing.  Enabling this allows all modes to be tested without having to drive
@@ -42,7 +42,7 @@
   #define BASE_MODE 1
   #define NUM_A_CHAN 3 // number of analog channels
   #define NUM_D_CHAN 21 // number of digital channels
-  //Note: GPIO_D_MASK is relative to the pins of the chip, whereas the 
+  //Note: GPIO_D_MASK is relative to the pins of the chip, whereas the
   //MEM_D_MASK is relative to the value written in memory, those may be different depending
   //on how data is shifted from the GPIOs into memory.
   #define GPIO_D_MASK 0x7FFFFC  //Mask of bits for digital inputs
@@ -55,7 +55,7 @@
 #elif PICO_MODE == 1  //Digital 26
   #define DIG_26_MODE 1
   #define NUM_A_CHAN 0 // number of analog channels
-  #define NUM_D_CHAN 26 // number of digital channels 
+  #define NUM_D_CHAN 26 // number of digital channels
   #define GPIO_D_MASK 0x1C7FFFFF  //Mask of bits for digital inputs
   #define MEM_D_MASK_L 0x007FFFFF  //lower mask of bits for digital inputs
   #define MEM_D_MASK_U 0x1C000000  //upper mask of bits for digital inputs
@@ -85,8 +85,8 @@
 #ifdef PICO_RP2350
  #define DMA_BUF_SIZE 476000 //add the full 256KB increase
 #else
- #define DMA_BUF_SIZE 220000 
-#endif 
+ #define DMA_BUF_SIZE 220000
+#endif
 // The size of the buffer sent to the CDC serial
 // The TUD CDC buffer is only 256B so it doesn't help to have more than this.
 #define TX_BUF_SIZE 260
@@ -117,7 +117,7 @@ typedef struct
    // number of samples for one of the 4 dma target arrays.  While this normally is related to the
    //half buffer sizes, in the optimized sending mode the value is temporarily overrided to adjust
    //the number of samples sent by the send_slice* functions.
-   uint32_t samples_per_half; 
+   uint32_t samples_per_half;
    uint8_t a_chan_cnt;        // count of enabled analog channels
    uint8_t d_chan_cnt;        // count of enabled digital channels
    uint8_t d_tx_bps;          // Digital Transmit bytes per slice

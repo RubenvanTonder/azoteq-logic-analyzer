@@ -4,7 +4,11 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <pico/stdlib.h>
 #include <stdlib.h>
+#include "pico/bootrom.h"
+#include <string.h>
+
 
 int Dprintf(const char *fmt, ...)
 {
@@ -132,10 +136,10 @@ int process_char(sr_device_t *d, char charin)
             Dprintf("Entering Bootsel mode\n\r");
             sleep_ms(1000);
             //reset with inputs per cold boot
-            rom_reset_usb_boot(0,0);
+            reset_usb_boot(0,0);
          }else{
             Dprintf("Invald bootsel command - enter \"bootsel\"\n\r");
-         } 
+         }
          ret=0;
          break;
       case 'i':
@@ -234,9 +238,9 @@ int process_char(sr_device_t *d, char charin)
          Dprintf("Pre-trigger samples %d cmd %s\n\r", tmpint, d->cmdstr);
          ret = 1;
          break;
-      //Enable/disable Analog channel   
+      //Enable/disable Analog channel
       // format is Axyy where x is 0 for disabled, 1 for enabled and yy is channel #
-      case 'A':                          
+      case 'A':
          tmpint = d->cmdstr[1] - '0';     // extract enable value
          tmpint2 = atoi(&(d->cmdstr[2])); // extract channel number
          if ((tmpint >= 0) && (tmpint <= 1) && (tmpint2 >= 0) && (tmpint2 <= 31))
@@ -288,19 +292,19 @@ int process_char(sr_device_t *d, char charin)
             #ifdef BASE_MODE //D0-20 are GP2..GP22
                tmpint2=tmpint+2;
             #elif DIG_26_MODE //D0-D22,D23-D25 are GP0..GP22,GP26..GP28
-               tmpint2=(tmpint<=22) ? tmpint : tmpint+3; 
+               tmpint2=(tmpint<=22) ? tmpint : tmpint+3;
             #else //DIG_32_MODE and all else are direct mapped.
                tmpint2=tmpint;
             #endif
             Dprintf("NameD %c %d %d\n\r", d->cmdstr[1],tmpint,tmpint2);
             sprintf(d->rspstr, "GP%d",tmpint2);
-            ret=1;            
+            ret=1;
           } else  if(d->cmdstr[1]=='A'){
             //ADC0/1/2 are GP26,27,28
             tmpint2=tmpint+26;
             Dprintf("NameA %c %d %d\n\r", d->cmdstr[1],tmpint,tmpint2);
             sprintf(d->rspstr, "ADC%d_GP%d",tmpint,tmpint2);
-            ret=1;            
+            ret=1;
           } else{
             ret=0;
           }
