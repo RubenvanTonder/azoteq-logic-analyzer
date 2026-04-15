@@ -27,7 +27,7 @@
 // Note: In the wireless versions, GPIO23-25 control the wifi chip, 23 and 24
 //aren't available in the PICO, and 25 controls the LED. So while the LED is lost,
 //there is no change in available channels for sampling.
-#define PICO_MODE 0 //0 is baseline, 1 is digital 26, 2 is digital 32
+#define PICO_MODE 0 //0 is baseline, 1 is digital 26, 2 is digital 32, 3 is Azoteq Logic Analyzer
 //WARNING: USE PIN_TEST_MODE with extreme caution!!!!
 //If set, treat the inputs (A&D) to be outputs so that the device can drive values for
 //turn-on testing.  Enabling this allows all modes to be tested without having to drive
@@ -38,20 +38,21 @@
 #undef DIG_26_MODE
 #undef DIG_32_MODE
 #undef HAS_LED
-#if PICO_MODE == 0 //Baseline
+#if PICO_MODE == 0 // Digital 8, Analog 2, PWM 2 (Only supports RP2354)
   #define BASE_MODE 1
-  #define NUM_A_CHAN 3 // number of analog channels
-  #define NUM_D_CHAN 21 // number of digital channels
-  //Note: GPIO_D_MASK is relative to the pins of the chip, whereas the
+  #define AZO_MODE 1
+  #define NUM_A_CHAN 2 // number of analog channels
+  #define NUM_D_CHAN 8 // number of digital channels
+    //Note: GPIO_D_MASK is relative to the pins of the chip, whereas the
   //MEM_D_MASK is relative to the value written in memory, those may be different depending
   //on how data is shifted from the GPIOs into memory.
-  #define GPIO_D_MASK 0x7FFFFC  //Mask of bits for digital inputs
+  #define GPIO_D_MASK 0x0003FC  //Mask of bits for digital inputs
   #define UART_EN 1
-  //Since this mode has all digital inputs contigous, the upper mask isn't needed.
-  #define MEM_D_MASK_L 0x007FFFFF  //lower mask of bits for digital inputs
+  #define MEM_D_MASK_L 0x3FC  //lower mask of bits for digital inputs
   #define MEM_D_MASK_U 0x0  //upper mask of bits for digital inputs
-  #define PIN_TEST_MASK 0x1C7FFFFE
+  #define PIN_TEST_MASK 0x001FFC
   #define HAS_LED 1
+  #define LED_PIN 25
 #elif PICO_MODE == 1  //Digital 26
   #define DIG_26_MODE 1
   #define NUM_A_CHAN 0 // number of analog channels

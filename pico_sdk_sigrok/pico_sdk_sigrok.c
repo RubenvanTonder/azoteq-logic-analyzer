@@ -25,7 +25,7 @@
 //The enable means we will start the mode once, the run indicates it is currently running.
 //To enable the feature, set forced_test_mode_en to true, but leave forced_test_mode_run false.
 bool forced_test_mode_en=false; //true;
-bool forced_test_mode_run=false; 
+bool forced_test_mode_run=false;
 PIO pio = pio0;
 uint piosm=0;
 uint8_t *capture_buf;
@@ -43,14 +43,14 @@ uint32_t bytecnt=0; //count of characters sent serially
   uint32_t pin_test_cnt=0;
   //The systick code is used to determine whether the 100us is reliably
   //being generated.  If it is not then the test samples can look "stretched"
-  #define SYSTICK_SIZE 128 
+  #define SYSTICK_SIZE 128
   #define SYSTICK_PRINT 64
   uint32_t systick_array[SYSTICK_SIZE];
   uint32_t systick_idx=0;
 #endif //PIN_TEST_MODE
 //Number of bytes stored as DMA per slice, must be 1,2 or 4 to support aligned access
 //This will be be zero for 1-4 digital channels.
-uint8_t d_dma_bps; 
+uint8_t d_dma_bps;
 uint32_t samp_remain;
 uint32_t lval,cval; //last and current digital sample values
 uint32_t num_halves; //track the number of halves we have processed
@@ -58,12 +58,12 @@ uint32_t exp_halves; //the number of halves we expect in non-continous mode
 uint32_t halves_seen=0;
 uint admachan0,admachan1,pdmachan0,pdmachan1;
 //While 1 maintenance DMA could write the pio and adc DMAs, they may complete
-//at slightly different times, and based on channel configurations an adc or pio 
+//at slightly different times, and based on channel configurations an adc or pio
 //may not be enabled so dedicate a maintence channel for each.
 uint amaintchan0,amaintchan1,pmaintchan0,pmaintchan1;
 dma_channel_config acfg0,acfg1,pcfg0,pcfg1,amcfg0,amcfg1,pmcfg0,pmcfg1;
 //Two addresses for adc and pio dma engines
-//These are read by the maintenance DMA engines and written to the 
+//These are read by the maintenance DMA engines and written to the
 //PIO/ADC DMA engine write addrs
 uint32_t *amaddrs[2]={0,0};
 uint32_t *pmaddrs[2]={0,0};
@@ -83,8 +83,8 @@ uint32_t tx_cnt; //number of times we did any kind of send
 uint32_t acnt,bcnt,ccnt,dcnt,ecnt;
 
 void print_DMA(){
-  //Print out the read addr, write addr, transaction count, and control/status 
-  //of the lowest 8 DMA controllers. Note that relative to RP2040, the RP2350 moved the 
+  //Print out the read addr, write addr, transaction count, and control/status
+  //of the lowest 8 DMA controllers. Note that relative to RP2040, the RP2350 moved the
   //location of busy and chain_to (and maybe others)
   /*
   tmpptr=(uint32_t *)DMA_BASE;
@@ -99,7 +99,7 @@ void print_DMA(){
   }
 
 void print_DMA_chan(int chan){
-  //Print out the read addr, write addr, transaction count, and control/status 
+  //Print out the read addr, write addr, transaction count, and control/status
   //of one channel
   tmpptr=(uint32_t *)DMA_BASE;
   //note that in pointer math +1 adds 4B for a uint, so this is offset 0,4,8,c
@@ -117,7 +117,7 @@ void print_DMA_chan(int chan){
 //to be specified. (The C standard write function doesn't seem to work at all).
 //This function also avoids the inserting of CR/LF in certain modes.
 //The tud_cdc_write_available function returns 256, and thus we have a 256B buffer to feed into
-//but the CDC serial issues in groups of 64B.  
+//but the CDC serial issues in groups of 64B.
 //Since there is another memory fifo inside the TUD code this might possibly be optimized
 //to directly write to it, rather than writing txbuf.  That might allow faster rle processing
 //but is a bit too complicated.
@@ -125,7 +125,7 @@ void print_DMA_chan(int chan){
 void my_stdio_usb_out_chars(const char *buf, int length) {
     static uint64_t last_avail_time;
     uint32_t owner;
-// See https://github.com/pico-coder/sigrok-pico/pull/63/.  
+// See https://github.com/pico-coder/sigrok-pico/pull/63/.
 //tud_ready does not rely on DTR
 // so use it rather than tud_cdc_connected
 //    if (tud_cdc_connected()) {
@@ -156,7 +156,7 @@ void my_stdio_usb_out_chars(const char *buf, int length) {
     }
 }
 
-//A common init for all send_slice modes 
+//A common init for all send_slice modes
 void send_slice_init(sr_device_t *d,uint8_t *dbuf){
    rxbufdidx=0;
    rxbufaidx=0;
@@ -174,8 +174,8 @@ void send_slice_init(sr_device_t *d,uint8_t *dbuf){
    }
 }
 
-//This is an optimized transmit of trace data for configurations with 4 or fewer digital channels 
-//and no analog.  Run length encoding (RLE) is used to send counts of repeated values to effeciently utilize 
+//This is an optimized transmit of trace data for configurations with 4 or fewer digital channels
+//and no analog.  Run length encoding (RLE) is used to send counts of repeated values to effeciently utilize
 //USB CDC link bandwidth.  This is the only mode where a given serial byte can have both sample information
 //and RLE counts.
 //Samples from PIO are dma'd in 32 bit words, each containing 8 samples of 4 bits (1 nibble).
@@ -196,7 +196,7 @@ uint32_t send_slices_D4(sr_device_t *d,uint8_t *dbuf){
    //as we should also be in free running mode or split the two halves
    //into something with 8 samples.
    send_slice_init(d,dbuf);
-   //Don't optimize the first word (eight samples) perfectly, just send them to make the for loop easier, 
+   //Don't optimize the first word (eight samples) perfectly, just send them to make the for loop easier,
    //and setup the initial conditions for rle tracking
    cptr=(uint32_t *) &(dbuf[0]);
    cword=*cptr;
@@ -209,7 +209,7 @@ uint32_t send_slices_D4(sr_device_t *d,uint8_t *dbuf){
      txbuf[j]=(nibcurr)|0x80;
      cword>>=4;
    }
-   niblast=nibcurr;      
+   niblast=nibcurr;
    cptr=(uint32_t *) &(txbuf[0]);
    txbufidx+=8;
    rxbufdidx+=4;
@@ -242,7 +242,7 @@ uint32_t send_slices_D4(sr_device_t *d,uint8_t *dbuf){
        while(rlecnt>=640){
          txbuf[txbufidx++]=127;
          rlecnt-=640;
-         if(txbufidx>3){   
+         if(txbufidx>3){
             my_stdio_usb_out_chars(txbuf,txbufidx);
             bytecnt+=txbufidx;
             txbufidx=0;
@@ -273,12 +273,12 @@ uint32_t send_slices_D4(sr_device_t *d,uint8_t *dbuf){
             if(rlecnt>7) {
 	       int rlemid=rlecnt&0x3F8;
                txbuf[txbufidx++]=(rlemid>>3)+47;
-            } 
+            }
             //And finally the 0..7 rle along with the new value
             rlecnt&=0x7;
             #ifdef D4_DBG2 //print when sample value changes
  	       Dprintf("VChang val 0x%X rlecnt %d i%d j%d \n\r",nibcurr,rlecnt,i,j);
-            #endif		  
+            #endif
             txbuf[txbufidx++]=0x80|nibcurr|rlecnt<<4;
             rlecnt=0;
 	  }//nibcurr!=last
@@ -308,7 +308,7 @@ uint32_t send_slices_D4(sr_device_t *d,uint8_t *dbuf){
       int rleend=rlecnt&0x3F8;
       txbuf[txbufidx++]=(rleend>>3)+47;
     }
-    //1..7 RLE 
+    //1..7 RLE
     //The rle and value encoding counts as both a sample count of rle and a new sample
     //thus we must decrement rlecnt by 1 and resend the current value which will match the previous values
     //(if the current value didn't match, the rlecnt would be 0).
@@ -330,7 +330,7 @@ uint32_t send_slices_D4(sr_device_t *d,uint8_t *dbuf){
 void inline tx_d_samp(sr_device_t *d,uint32_t cval){
     for(char b=0;b < d->d_tx_bps;b++){
       txbuf[txbufidx++]=(cval|0x80);
-//      Dprintf("txds b %d cv 0x%X idx %d \n\r",b,cval,txbufidx); 
+//      Dprintf("txds b %d cv 0x%X idx %d \n\r",b,cval,txbufidx);
       cval>>=7;
     }
 }
@@ -355,7 +355,7 @@ uint32_t  get_cval(uint8_t *dbuf){
            #elif BASE_MODE
               //mask off upper unused
                cval=cval&MEM_D_MASK_L;
-              //No change for DIG_32_MODE as all are defined  
+              //No change for DIG_32_MODE as all are defined
            #endif
        }
        rxbufdidx+=d_dma_bps;
@@ -370,7 +370,7 @@ of txbuf. We do not always push to USB to reduce its impact
 on performance.
  */
 void inline check_rle(){
-//  Dprintf("RLEx %d\n\r",rlecnt); 
+//  Dprintf("RLEx %d\n\r",rlecnt);
   while(rlecnt>=1568){
     txbuf[txbufidx++]=127;
     rlecnt-=1568;
@@ -396,7 +396,7 @@ void check_tx_buf(uint16_t cnt){
   }
 }
 //A common first digital byte to send to establish RLE.
-//Not used for send_analog because it doesn't use RLE, and not used for D4 because it 
+//Not used for send_analog because it doesn't use RLE, and not used for D4 because it
 //has a different RLE encoding
 void send_first_dig_sample(sr_device_t *d,uint8_t *dbuf){
    lval=get_cval(dbuf);
@@ -405,23 +405,23 @@ void send_first_dig_sample(sr_device_t *d,uint8_t *dbuf){
    rlecnt=0;
 }
 //There are three very similar functions send_slices_1B/2B/4B.
-//Each of which  is very similar but exist because if a common function 
-//is used with the get_cval in the inner loop, the performance drops 
+//Each of which  is very similar but exist because if a common function
+//is used with the get_cval in the inner loop, the performance drops
 //substantially.  Thus each function has a 1,2, or 4B aligned read respectively.
 //We can't just always read a 4B value because the core doesn't support non-aligned accesses.
 //These must be marked noinline to ensure they remain separate functions for good performance
 //1B is 5-8 channels
 void __attribute__ ((noinline)) send_slices_1B(sr_device_t *d,uint8_t *dbuf){
    send_slice_init(d,dbuf);
-//   Dprintf("Enter 1Ba sts %d sr %d\n\r",d->samples_per_half,samp_remain); 
+//   Dprintf("Enter 1Ba sts %d sr %d\n\r",d->samples_per_half,samp_remain);
    send_first_dig_sample(d,dbuf);
    for(int s=0;s<samp_remain;s++){
-       cval=dbuf[rxbufdidx++]; 
+       cval=dbuf[rxbufdidx++];
        if(cval==lval){
            rlecnt++;
          }
        else{
-//         Dprintf("SB n 0x%X o 0x%X rle %d ridx %d\n\r",cval,lval,rlecnt,rxbufdidx); 
+//         Dprintf("SB n 0x%X o 0x%X rle %d ridx %d\n\r",cval,lval,rlecnt,rxbufdidx);
          check_rle();
          tx_d_samp(d,cval);
          check_tx_buf(TX_BUF_THRESH);
@@ -467,7 +467,7 @@ void __attribute__ ((noinline)) send_slices_4B(sr_device_t *d,uint8_t *dbuf){
        #elif BASE_MODE
         //mask off upper unused
         cval=cval&MEM_D_MASK_L;
-        //No change for DIG_32_MODE as all are defined  
+        //No change for DIG_32_MODE as all are defined
        #endif
        if(cval==lval){
       	   rlecnt++;
@@ -484,7 +484,7 @@ void __attribute__ ((noinline)) send_slices_4B(sr_device_t *d,uint8_t *dbuf){
 }//send_slices_4B
 
 
-//Slice transmit code, used for all cases with any analog channels 
+//Slice transmit code, used for all cases with any analog channels
 //All digital channels for one slice are sent first in 7 bit bytes using values 0x80 to 0xFF
 //Analog channels are sent next, with each channel taking one 7 bit byte using values 0x80 to 0xFF.
 //This does not support run length encoding because it's not clear how to define RLE on analog signals
@@ -504,7 +504,7 @@ uint32_t send_slices_analog(sr_device_t *d,uint8_t *dbuf,uint8_t *abuf){
            txbufidx++;
            rxbufaidx++;
 	   //Dprintf("av %X cnt %d idx t %d r %d\n\r",abuf[rxbufaidx-1],d->a_chan_cnt,txbufidx,rxbufaidx);
-         } 
+         }
          //Since this doesn't support RLEs we don't need to buffer
          //extra bytes to prevent txbuf overflow, but this value
          //works well anyway
@@ -544,7 +544,7 @@ void send_half(void){
   if(dev.usb_plus){
     dev.state=SAMPLES_SENT;
  //   Dprintf("SH_USB_PLUS_SS\n\r");
-  //At DMA_DONE transition to SAMPLES_SENT when all samples are sent    
+  //At DMA_DONE transition to SAMPLES_SENT when all samples are sent
   }else if(dev.state==DMA_DONE){
     if((dev.scnt>=dev.num_samples) || (dev.cont==true)){
       dev.state=SAMPLES_SENT;
@@ -572,7 +572,7 @@ void dma_int_handler(){
   int sts;
   //Have we detected any cases were dma should be turnned off and interrupts disabled?
   //this includes error/abort and non error/abort cases
-  bool dma_done=false; 
+  bool dma_done=false;
   bool partial=true;
   sts=dma_hw->ints0;
   currintmask|=sts;
@@ -593,8 +593,8 @@ void dma_int_handler(){
   else if(dev.usb_plus){
      Dprintf("INT skip plus\n\r");
      dma_done=true;
-  }  
-  //This first checks says that if we have seen an IRQ for either of the 
+  }
+  //This first checks says that if we have seen an IRQ for either of the
   //lower halves and an IRQ for either of the upper halves that we have overflowed.
   //This is rather exceptional as it means we managed to finish DMAs for both
   //halves and only called the interrupt handler once.
@@ -608,14 +608,14 @@ void dma_int_handler(){
   //If we haven't detected any errors process the current interrupt mask
   //Note that in very high sample rates with low number of samples we may reach this interrupt handler
   //with both halves being valid, so check and clear each half independently
-  else { 
+  else {
     if((currintmask&h0intmask)==h0intmask){
        //Dprintf("H0\n\r");
        partial=false;
        currintmask=currintmask & ~h0intmask;
        dma_halves++;
        //print_DMA();
-    }     
+    }
     //We have gotten the expected interrupts for upper
     if((currintmask&h1intmask)==h1intmask){
        //Dprintf("H1\n\r");
@@ -623,15 +623,15 @@ void dma_int_handler(){
        currintmask=currintmask & ~h1intmask;
        dma_halves++;
        //print_DMA();
-     }  
+     }
   }
-  //A partial means we have gotten either the PIO or the DMA for a given half 
+  //A partial means we have gotten either the PIO or the DMA for a given half
   //but not both, in that case exit the handler waiting for the other to catch up
   if(partial){
      //Dprintf("PRT %X\n",currintmask);
   }
-  
-//This 2nd overflow check says if dma_halves is more than one ahead of num_halves then we are starting to 
+
+//This 2nd overflow check says if dma_halves is more than one ahead of num_halves then we are starting to
 //overwrite a buffer we are sending. Note that it is after we increment dma_halves .
   if((mask_xfer_err==false)
      && (dma_halves-num_halves>1))
@@ -643,7 +643,7 @@ void dma_int_handler(){
    }
    //Stop non continous mode when we reach expected number of halves
    if(dma_halves==exp_halves){
-    //Dprintf("EXP_DNE %d\n\r",exp_halves); 
+    //Dprintf("EXP_DNE %d\n\r",exp_halves);
     dma_done=true;
    }
   //Once dma_done is detected disable all the dma channels and then disable
@@ -666,13 +666,13 @@ void dma_int_handler(){
       dma_channel_abort(amaintchan1);
       dma_channel_abort(pmaintchan0);
       dma_channel_abort(pmaintchan1);
-      dma_channel_set_irq0_enabled(admachan0, false);   
-      dma_channel_set_irq0_enabled(pdmachan0, false);   
-      dma_channel_set_irq0_enabled(admachan1, false);   
-      dma_channel_set_irq0_enabled(pdmachan1, false); 
+      dma_channel_set_irq0_enabled(admachan0, false);
+      dma_channel_set_irq0_enabled(pdmachan0, false);
+      dma_channel_set_irq0_enabled(admachan1, false);
+      dma_channel_set_irq0_enabled(pdmachan1, false);
       if((dev.state!=ABORTED)&&(dev.usb_plus==false)){
         dev.state=DMA_DONE;
-      } 
+      }
 
   }
   //clear the pended interrupt
@@ -716,7 +716,7 @@ void core1_entry(){
     gpio_init_mask(PIN_TEST_MASK); //set to function SIO as input
     //Note the pin directions are handled in the timer call back.
     //gpio_set_dir_masked(PIN_TEST_MASK,PIN_TEST_MASK); //masked set per pin.  1 is output, 0 is input
-    //                     delay in us, call back,      userdata, timer    
+    //                     delay in us, call back,      userdata, timer
     add_repeating_timer_us(100,pin_test_timer_callback,NULL,&pt_timer);
     gpio_set_dir_masked(PIN_TEST_MASK,PIN_TEST_MASK); //masked set per pin.  1 is output, 0 is input
     Dprintf("Pin Test Mode Timer Added\n\r");
@@ -736,61 +736,61 @@ int main(){
      uart_init(uart0,UART_BAUD);
      gpio_set_function(0, GPIO_FUNC_UART);
     //The uart Rx has never been used, but left in for the baseline definition
-     gpio_set_function(1, GPIO_FUNC_UART); 
-    #endif  
+     gpio_set_function(1, GPIO_FUNC_UART);
+    #endif
     //This sleep may not be necessary, but was added to give USB extra time to come up.
     //But an extra .1 seconds won't bother anything...
-    sleep_us(100000);    
+    sleep_us(100000);
     Dprintf("\n\rHello from PICO sigrok device \n\r");
     //Pulse the LED in a morse code "P" to confirm programming
     #ifdef HAS_LED
-        gpio_init(PICO_DEFAULT_LED_PIN);
-        gpio_set_function(PICO_DEFAULT_LED_PIN,GPIO_FUNC_SIO);
-        gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+        gpio_init(LED_PIN);
+        gpio_set_function(LED_PIN,GPIO_FUNC_SIO);
+        gpio_set_dir(LED_PIN, GPIO_OUT);
         //More Code "P"
         //dit
-        gpio_put(PICO_DEFAULT_LED_PIN, true);
+        gpio_put(LED_PIN, true);
         sleep_ms(delay);
-        gpio_put(PICO_DEFAULT_LED_PIN, false);
-        sleep_ms(delay);
-        //dah
-        gpio_put(PICO_DEFAULT_LED_PIN, true);
-        sleep_ms(delay*3);
-        gpio_put(PICO_DEFAULT_LED_PIN, false);
+        gpio_put(LED_PIN, false);
         sleep_ms(delay);
         //dah
-        gpio_put(PICO_DEFAULT_LED_PIN, true);
+        gpio_put(LED_PIN, true);
         sleep_ms(delay*3);
-        gpio_put(PICO_DEFAULT_LED_PIN, false);
+        gpio_put(LED_PIN, false);
+        sleep_ms(delay);
+        //dah
+        gpio_put(LED_PIN, true);
+        sleep_ms(delay*3);
+        gpio_put(LED_PIN, false);
         sleep_ms(delay);
         //dit
-        gpio_put(PICO_DEFAULT_LED_PIN, true);
+        gpio_put(LED_PIN, true);
         sleep_ms(delay);
-        gpio_put(PICO_DEFAULT_LED_PIN, false);
+        gpio_put(LED_PIN, false);
         sleep_ms(delay*2);
-        
+
     #endif
     uint f_pll_sys = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_PLL_SYS_CLKSRC_PRIMARY);
     Dprintf("pll_sys = %dkHz\n\r", f_pll_sys);
     uint f_clk_sys = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
     Dprintf("clk_sys = %dkHz\n\r", f_clk_sys);
-    #ifndef DIG_32_MODE 
+    #ifndef DIG_32_MODE
     //Set GPIO23 (TP4) to control switched mode power supply noise
-    //This may reduce noise into the ADC in some use cases.   
+    //This may reduce noise into the ADC in some use cases.
     gpio_init_mask(1<<23);
     gpio_set_dir_masked(1<<23,1<<23);
     gpio_put_masked(1<<23,1<<23);
     #endif
     //Early CDC IO code had lots of sleep statements, but the TUD code seems to have sufficient
     //checks that this isn't needed, but it doesn't hurt...
-    sleep_us(100000);    
+    sleep_us(100000);
     //GPIOs 26 through 28 (the ADC ports) are on the PICO, GPIO29 is not a pin on the PICO
     //Note that digital only modes don't block all configuration related to ADC, but does enough
     //to ensure we can properly sample the pins digitally.
-    #ifdef BASE_MODE
-    adc_gpio_init(26);
-    adc_gpio_init(27);
-    adc_gpio_init(28);
+    #ifdef BASE_MODE /*RP2354 Only*/
+    adc_gpio_init(26); //41
+    adc_gpio_init(27); //42
+    // adc_gpio_init(28); not used
     adc_init();
     #endif
 
@@ -860,8 +860,8 @@ int main(){
     channel_config_set_dreq(&pmcfg1, DMA_CH0_CTRL_TRIG_TREQ_SEL_VALUE_PERMANENT);
 
     //Chaining is always enabled with PIO0->PMAINT0->PIO1->PMAINT1->PIO0
-    //and ADMA0->AMAINT0->ADMA1->AMAINT1->ADMA0, except in mask_xfer_err case where 
-    //we know we will only have two half buffers and will likely fill them way before 
+    //and ADMA0->AMAINT0->ADMA1->AMAINT1->ADMA0, except in mask_xfer_err case where
+    //we know we will only have two half buffers and will likely fill them way before
     //we can process them.  In that case we end the chaining by not doing a chaint_to
     //from maintenance 1.
     //The mask_xfer_err override is handled as part of the init for each sample run
@@ -880,11 +880,11 @@ int main(){
     pioflvl=(volatile uint32_t *)(PIO0_BASE+0x10); //PIO FLVL
     //TODO (coding style)- use a better csr reference name that points diretly
     volatile uint32_t *pio0sm0clkdiv;
-    pio0sm0clkdiv=(volatile uint32_t *)(PIO0_BASE+0xc8); 
+    pio0sm0clkdiv=(volatile uint32_t *)(PIO0_BASE+0xc8);
     //Give High priority to DMA to ensure we don't overflow the PIO or DMA fifos
     //The DMA controller must read across the common bus to read the PIO fifo so enabled both reads and write
     bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS;
-    
+
     init(&dev);
     //Since RP2040 is 32 bit this should always be 4B aligned, and it must be because the PIO
     //does DMA on a per byte basis
@@ -896,7 +896,7 @@ int main(){
     uint8_t *tptr;
     tptr=malloc(10000);
     Dprintf("10K free start %p\n\r",(void *)tptr);
-    free(tptr); 
+    free(tptr);
 
 
    gpio_init_mask(GPIO_D_MASK); //set as GPIO_FUNC_SIO and clear output enable
@@ -930,13 +930,13 @@ while(1){
               dev.d_mask=0xF;
               dev.a_mask=0x1;
              //min 5khz sample rate
-             //TODO (ADC)-Need to add support for ADC clocking/overclocking 
+             //TODO (ADC)-Need to add support for ADC clocking/overclocking
              //- setting to 1MHZ seems to break if ADC is enabled .
              //To do this likely requires a sysclk boost
               dev.sample_rate=2000000;
               dev.num_samples=2000000;
               dev.scnt=0; //number of samples sent
-            
+
               //Clear this on first past
               forced_test_mode_en=false;
               forced_test_mode_run=true;
@@ -947,7 +947,7 @@ while(1){
          if(dev.state==STARTED) {
           bool adc_aborting=false;
           Dprintf("STRTING\n\r");
-           //Sample rate must always be even.  Pulseview code enforces this 
+           //Sample rate must always be even.  Pulseview code enforces this
            //because it specifies a fixed set of frequencies, but sigrok cli can still odd ones.
            dev.sample_rate>>=1;
            dev.sample_rate<<=1;
@@ -963,9 +963,9 @@ while(1){
            uint32_t d_nibbles,a_nibbles,t_nibbles; //digital, analog and total nibbles
            d_nibbles=dev.d_nps;  //digital is in grous of 4 bits
            //Note that this code only supports 7 bit accurate ADC modes.
-           a_nibbles=dev.a_chan_cnt*2; //1 byte per sample 
+           a_nibbles=dev.a_chan_cnt*2; //1 byte per sample
            t_nibbles=d_nibbles+a_nibbles;
-           //total buf size must be a multiple of a_nibbles*2, d_nibbles*8, and t_nibbles so that 
+           //total buf size must be a multiple of a_nibbles*2, d_nibbles*8, and t_nibbles so that
            //division is always in whole samples.
            //Also set a multiple of 32  because the dma buffer is split in half, and
            //the PIO does writes on 4B boundaries, and then a 4x factor for any other size/alignment issues
@@ -986,7 +986,7 @@ while(1){
            //logic that is looking for cases where we didn't send one half buffer to the host before
            //the 2nd buffer ended because we only use each half buffer once.
            mask_xfer_err=false;
-           //If requested samples are smaller than the buffer, reduce the size so that the 
+           //If requested samples are smaller than the buffer, reduce the size so that the
            //transfer completes sooner.
            //Also, mask the sending of aborts if the requested number of samples fit into RAM
            //Don't do this in continuous mode as the final size is unknown
@@ -1015,11 +1015,11 @@ while(1){
            if(dev.cont==false && (dev.num_samples%dev.samples_per_half)) exp_halves++;
            Dprintf("Final sizes d %d a %d mask err %d samples per half %d exp %d\n\r",dev.d_size,dev.a_size,mask_xfer_err,dev.samples_per_half,exp_halves);
 
-           //Clear any previous ADC over/underflow	    
+           //Clear any previous ADC over/underflow
             volatile uint32_t *adcfcs;
             adcfcs=(volatile uint32_t *)(ADC_BASE+0x8);//ADC FCS
             *adcfcs|=0xC00;
-          //Ensure any previous dma is done 
+          //Ensure any previous dma is done
           //The cleanup loop also does this but it doesn't hurt to do it twice
           dma_channel_abort(admachan0);
           dma_channel_abort(admachan1);
@@ -1042,22 +1042,22 @@ while(1){
           //         ,dev.d_nps,dev.a_chan_cnt,dev.d_size,dev.a_size,dev.a_mask);
           Dprintf("start offsets d0 0x%X d1 0x%X a0 0x%X a1 0x%X samperhalf %u\n\r"
               ,dev.dbuf0_start,dev.dbuf1_start,dev.abuf0_start,dev.abuf1_start,dev.samples_per_half);
-//For debug clear out initial values, but not needed in normal operation              
+//For debug clear out initial values, but not needed in normal operation
 //          for(uint32_t x=0;x<DMA_BUF_SIZE;x++){
-//            capture_buf[x]=0x12; 
-//          }                  
+//            capture_buf[x]=0x12;
+//          }
 #ifdef PIN_TEST_MODE
           for(uint32_t x=0;x<SYSTICK_SIZE;x++){
-            systick_array[x]=0x0; 
-          }         
-          systick_idx=0;       
+            systick_array[x]=0x0;
+          }
+          systick_idx=0;
 #endif //PIN_TEST_MODE
           //Dprintf("starting data buf values 0x%X 0x%X\n\r",capture_buf[dev.dbuf0_start],capture_buf[dev.dbuf1_start]);
           uint32_t adcdivint=48000000ULL/(dev.sample_rate*dev.a_chan_cnt);
           if(dev.a_chan_cnt){
       	     adc_run(false);
              //             en, dreq_en,dreq_thresh,err_in_fifo,byte_shift to 8 bit
-             adc_fifo_setup(false, true,   1,           false,       true); 
+             adc_fifo_setup(false, true,   1,           false,       true);
              adc_fifo_drain();
              //Dprintf("astart cnt %u div %f\n\r",dev.a_chan_cnt,(float)adcdivint);
              //This sdk function doesn't support support the fractional divisor
@@ -1068,21 +1068,21 @@ while(1){
    	         //It is also import to subtract one from the desired divisor
 	           //because the period of ADC clock is 1+INT+FRAC/256
 	           //For the case of a requested 500khz clock, we would normally write
-             //a divisor of 95, but doesn't give the desired result, so we use 
+             //a divisor of 95, but doesn't give the desired result, so we use
              //the 0 value instead.
              //Fractional divisors should generally be avoided because it creates
              //skew with digital samples.
              uint8_t adc_frac_int;
              adc_frac_int=(uint8_t)(((48000000ULL%dev.sample_rate)*256ULL)/dev.sample_rate);
-             if(adcdivint<=96){ 
+             if(adcdivint<=96){
                Dprintf("adcdivint of %d below 96, aborting\n\r",adcdivint);
                dev.state=ABORTED;
                adc_aborting=true;
                *adcdiv=0;
              }else{ //adcdivint legal
-	              *adcdiv=((adcdivint-1)<<8)|adc_frac_int; 
+	              *adcdiv=((adcdivint-1)<<8)|adc_frac_int;
                 Dprintf("adcdiv %u frac %d adcdivint %d\n\r",*adcdiv,adc_frac_int,adcdivint);
-                //This is needed to clear the AINSEL so that when the round robin arbiter starts 
+                //This is needed to clear the AINSEL so that when the round robin arbiter starts
                 //we start sampling on channel 0
                 adc_select_input(0);
                 adc_set_round_robin(dev.a_mask & 0x7);
@@ -1109,12 +1109,12 @@ while(1){
           }//any analog enabled
           if(dev.d_mask){
              //analyzer_init from pico-examples
-             //Due to how PIO shifts in bits, if any digital channel within a group of 8 is set, 
+             //Due to how PIO shifts in bits, if any digital channel within a group of 8 is set,
              //then all groups below it must also be set. We further restrict it in the tx_init function
              //by saying digital channel usage must be continous.
  /* pin count is restricted to 4,8,16 or 32, and pin count of 4 is only used
 Pin count is kept to a powers of 2 so that we always read a sample with a single byte/word/dword read
-for faster parsing.  
+for faster parsing.
    if analog is disabled and we are in D4 mode
     bits d_dma_bps   d_tx_bps
     0-4    0          1        No analog channels
@@ -1151,11 +1151,11 @@ for faster parsing.
                sm_config_set_in_pins(&c, 0); //start at GPIO0 since uart isn't used
              #elif DIG_32_MODE
                sm_config_set_in_pins(&c, 0); //start at GPIO0 since uart isn't used
-             #else 
+             #else
                sm_config_set_in_pins(&c, 2); //start at GPIO2 (keep 0 and 1 for uart)
              #endif
              sm_config_set_wrap(&c, offset, offset);
-             uint16_t div_int;              
+             uint16_t div_int;
              uint8_t frac_int;
              div_int=frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS)*1000/dev.sample_rate;
              if(div_int<1) div_int=1;
@@ -1173,7 +1173,7 @@ for faster parsing.
              pio_sm_set_enabled(pio, piosm, false); //clear the enabled bit
              //XOR the shiftctrl field with PIO_SM0_SHIFTCTRL_FJOIN_RX_BITS
              //Do it twice to restore the value
-             pio_sm_clear_fifos(pio, piosm); 
+             pio_sm_clear_fifos(pio, piosm);
              //write the restart bit of PIO_CTRL
              pio_sm_restart(pio, piosm);
              //Since PIO transfers 32 bit values but DMA transfers 8, the d_size is divided by 4.
@@ -1211,10 +1211,10 @@ for faster parsing.
           //Clear any pending interrupts
           //All dma interrupts go through a common handler so that we can check for
           //overflows etc.
-          dma_channel_set_irq0_enabled(admachan0, true);   
-          dma_channel_set_irq0_enabled(pdmachan0, true);   
-          dma_channel_set_irq0_enabled(admachan1, true);   
-          dma_channel_set_irq0_enabled(pdmachan1, true);   
+          dma_channel_set_irq0_enabled(admachan0, true);
+          dma_channel_set_irq0_enabled(pdmachan0, true);
+          dma_channel_set_irq0_enabled(admachan1, true);
+          dma_channel_set_irq0_enabled(pdmachan1, true);
 
           h0intmask=0;
           h1intmask=0;
@@ -1252,7 +1252,7 @@ for faster parsing.
           #ifdef BASE_MODE
           adc_run(true); //enable free run sample mode
           #endif
-          pio_sm_set_enabled(pio, piosm, true);           
+          pio_sm_set_enabled(pio, piosm, true);
         } //if ~adcaborting
         }//if dev.sending and not started
    //Send sample data
@@ -1260,7 +1260,7 @@ for faster parsing.
    //Drain all uart rxs (only tx is used for debug) if uart rx is not drained
    //it can cause code in the sdk to lock up serial CDC. These are rare noise/reset events
    //and thus not checked when dev.started to ensure the maintenance loop runs as fast
-   //as possible. 
+   //as possible.
    #if (UART_EN == 1)
    if(dev.state==IDLE){
       while (uart_is_readable_within_us(uart0, 0)) {
@@ -1269,13 +1269,13 @@ for faster parsing.
        }
       }
    #endif
-   //look for commands on usb cdc 
+   //look for commands on usb cdc
    ccnt=time_us_32();
    usbintin=getchar_timeout_us(0);
    dcnt=time_us_32();
    //The '+' is the only character we track during normal sampling because it can end
-   //a continuous trace or an aborted condition.  
-   //A reset '*' should only be seen after we have completed normally or hit an error condition. 
+   //a continuous trace or an aborted condition.
+   //A reset '*' should only be seen after we have completed normally or hit an error condition.
    //The plus ends an aborted loop, is ignored by IDLE, and sends started to IDLE.
    //In all other cases the effect is not immediate and it's up to the interrupt handler
    //or send_half to make use of it.
@@ -1296,10 +1296,10 @@ for faster parsing.
        }
     }
     //send_resp is set to true but not processed immediately so we can get back to send_half ASAP
-    else if(usbintin>=0){  
+    else if(usbintin>=0){
            bcnt++;
            if(process_char(&dev,(char)usbintin))
-             {send_resp=true;} 
+             {send_resp=true;}
     }
 
 	//The libsigrok processing of aborts is not clean, and may try to report the "!" as a bad rle value.
@@ -1321,20 +1321,20 @@ for faster parsing.
    if(dev.state==SAMPLES_SENT){
         //The end of sequence byte_cnt uses a "$<byte_cnt>+" format.
         char brsp[16];
-        //Give the host time to finish processing samples so that the bytecnt 
+        //Give the host time to finish processing samples so that the bytecnt
         //isn't dropped on the wire
         sleep_us(10000);
         Dprintf("Cleanup bytecnt %d\n\r",bytecnt);
         sprintf(brsp,"$%d%c",bytecnt,'+');
         puts_raw(brsp);
-        //Print out debug information after completing, rather than before so that it doesn't 
+        //Print out debug information after completing, rather than before so that it doesn't
         //delay the start of a capture
         Dprintf("Complete: SRate %d NSmp %d NHalves %d\n\r",dev.sample_rate,dev.num_samples,num_halves);
         Dprintf("Cont %d bcnt %d\n\r",dev.cont,bytecnt);
         Dprintf("DMsk 0x%X AMsk 0x%X\n\r",dev.d_mask,dev.a_mask);
         Dprintf("Half buffers exp %d DMA %d Sent %d sampperhalf %d\n\r",exp_halves,dma_halves,num_halves,dev.samples_per_half);
         dev.state=IDLE;
-#ifdef PIN_TEST_MODE        
+#ifdef PIN_TEST_MODE
         for(int y=0;y<SYSTICK_PRINT;y++){
              int delta;
              if(y==0){delta=0;}
@@ -1370,10 +1370,10 @@ for faster parsing.
      dma_channel_abort(amaintchan1);
      dma_channel_abort(pmaintchan0);
      dma_channel_abort(pmaintchan1);
-     dma_channel_set_irq0_enabled(admachan0, false);   
-     dma_channel_set_irq0_enabled(pdmachan0, false);   
-     dma_channel_set_irq0_enabled(admachan1, false);   
-     dma_channel_set_irq0_enabled(pdmachan1, false); 
+     dma_channel_set_irq0_enabled(admachan0, false);
+     dma_channel_set_irq0_enabled(pdmachan0, false);
+     dma_channel_set_irq0_enabled(admachan1, false);
+     dma_channel_set_irq0_enabled(pdmachan1, false);
      //clear any pended dma interrupts
      dma_hw->ints0=dma_hw->ints0;
      irq_set_enabled(DMA_IRQ_0, false);
@@ -1385,20 +1385,20 @@ for faster parsing.
      dev.usb_plus=false;
   } //if IDLE
 }//while(1)
- 
+
 
 }//main
 //Depracated trigger logic
-//This HW based trigger which should be part of send slices was tested enough to confirm the 
+//This HW based trigger which should be part of send slices was tested enough to confirm the
 //trigger value worked, however it
-//was not fully implemented because the RP2040 wasn't able to perform the trigger detection and 
-//memory buffer management to support sample rates that were substantially higher than the 
+//was not fully implemented because the RP2040 wasn't able to perform the trigger detection and
+//memory buffer management to support sample rates that were substantially higher than the
 //stream rates across USB.  Thus there wasn't a compelling reason to have it.
 //It's left as an example as to how the masks could be used.
 //  To fully support a HW based triggering, a precapture ring buffer of both digital and analog samples
-//would need to be created an managed to store and send pretrigger values. 
+//would need to be created an managed to store and send pretrigger values.
 //The ring buffer would need to support RLEs and would need to ensure it was sent before sending
-//other samples capture by the DMA after the trigger event. 
+//other samples capture by the DMA after the trigger event.
 /*
 //   uint32_t tlval; Trigger last val
 //   tlval=d->tlval;
@@ -1426,11 +1426,11 @@ for faster parsing.
               lbyte=cbyte>>(7-b);
               tlval>>=8;
 	      txbufidx++;
-           } //for b          
+           } //for b
          }//matches==all_mask
          d->notfirst=true;
        }
-       if(d->triggered){ 
+       if(d->triggered){
              //Transmit samples if we have already triggered.
         }
 
