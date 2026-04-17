@@ -293,8 +293,15 @@ int process_char(sr_device_t *d, char charin)
 //So in basemode, D0-D20 are GP2..GP22
 //in dig_26_mode D0-D22,D23-D25 are GP0..GP22,GP26..GP28
 //in dig_32_mode D0-D31 are GP0..GP31
-            #ifdef BASE_MODE //D0-20 are GP2..GP22
-               tmpint2=tmpint+2;
+            #ifdef BASE_MODE //D0-7 are GP2..GP9
+            if (tmpint==0){ tmpint2 = D1;}
+            if (tmpint==1){ tmpint2 = D2;}
+            if (tmpint==2){ tmpint2 = D3;}
+            if (tmpint==3){ tmpint2 = D4;}
+            if (tmpint==4){ tmpint2 = D5;}
+            if (tmpint==5){ tmpint2 = D6;}
+            if (tmpint==6){ tmpint2 = D7;}
+            if (tmpint==7){ tmpint2 = D8;}
             #elif DIG_26_MODE //D0-D22,D23-D25 are GP0..GP22,GP26..GP28
                tmpint2=(tmpint<=22) ? tmpint : tmpint+3;
             #else //DIG_32_MODE and all else are direct mapped.
@@ -304,8 +311,9 @@ int process_char(sr_device_t *d, char charin)
             sprintf(d->rspstr, "GP%d",tmpint2);
             ret=1;
           } else  if(d->cmdstr[1]=='A'){
-            //ADC0/1/2 are GP26,27,28
-            tmpint2=tmpint+26;
+            //ADC0/1/2 are GP41,42
+            if (tmpint == 0) { tmpint2 = ADC1;}
+            if (tmpint == 1) { tmpint2 = ADC2;}
             Dprintf("NameA %c %d %d\n\r", d->cmdstr[1],tmpint,tmpint2);
             sprintf(d->rspstr, "ADC%d_GP%d",tmpint,tmpint2);
             ret=1;

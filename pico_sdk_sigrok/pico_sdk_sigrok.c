@@ -788,8 +788,8 @@ int main(){
     //Note that digital only modes don't block all configuration related to ADC, but does enough
     //to ensure we can properly sample the pins digitally.
     #ifdef BASE_MODE /*RP2354 Only*/
-    adc_gpio_init(26); //41
-    adc_gpio_init(27); //42
+    adc_gpio_init(41); //41
+    adc_gpio_init(42); //42
     // adc_gpio_init(28); not used
     adc_init();
     #endif

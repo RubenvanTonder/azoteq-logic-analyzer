@@ -53,6 +53,16 @@
   #define PIN_TEST_MASK 0x001FFC
   #define HAS_LED 1
   #define LED_PIN 25
+  #define ADC1 41
+  #define ADC2 42
+  #define D1 2
+  #define D2 3
+  #define D3 4
+  #define D4 5
+  #define D5 6
+  #define D6 7
+  #define D7 8
+  #define D8 9
 #elif PICO_MODE == 1  //Digital 26
   #define DIG_26_MODE 1
   #define NUM_A_CHAN 0 // number of analog channels
