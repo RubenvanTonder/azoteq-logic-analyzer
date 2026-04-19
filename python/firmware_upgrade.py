@@ -3,6 +3,7 @@ import os
 import time
 import platform
 import serial
+print(f"DEBUG: Loaded serial from: {serial.__file__}")
 import serial.tools.list_ports
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, QComboBox, QPushButton, 
@@ -12,7 +13,7 @@ from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QPalette, QColor
 
 # ==========================================
-# 1. OPTIMIZED FLASHER WORKER (High Speed)
+# 1. FLASHER WORKER (High Speed)
 # ==========================================
 class FlasherWorker(QThread):
     status_update = pyqtSignal(str)
@@ -67,7 +68,6 @@ class FlasherWorker(QThread):
 
         self.status_update.emit("Searching for RPI-RP2...")
         
-        # 1. FAST POLLING
         while self.is_running and elapsed < timeout:
             target_drive = self.find_pico_drive()
             if target_drive:
@@ -80,7 +80,6 @@ class FlasherWorker(QThread):
             self.finished.emit(False, "Timeout: Drive not found.")
             return
 
-        # 2. HIGH SPEED RAW COPY
         self.status_update.emit(f"Flashing to {target_drive}...")
         self.progress_update.emit(50)
 
@@ -107,7 +106,6 @@ class FlasherWorker(QThread):
             self.finished.emit(True, "Flash Complete (Device Rebooting)")
 
         except OSError as e:
-            # Handle early disconnect as success
             err_str = str(e)
             if "No such device" in err_str or "Input/output error" in err_str or "Permission denied" in err_str:
                  self.progress_update.emit(100)
@@ -118,7 +116,7 @@ class FlasherWorker(QThread):
             self.finished.emit(False, f"Unexpected Error: {str(e)}")
 
 # ==========================================
-# 2. SERIAL WORKER
+# 2. SERIAL WORKER (PATCHED)
 # ==========================================
 class SerialWorker(QThread):
     data_received = pyqtSignal(bytes)
@@ -129,27 +127,43 @@ class SerialWorker(QThread):
         super().__init__()
         self.serial_port = None
         self.is_running = False
+        self.port_name = ""
+        self.baud_rate = 115200
 
     def connect_serial(self, port, baud):
         self.port_name = port
         self.baud_rate = baud
-        self.start()
+        # Ensure we don't try to start if already running
+        if not self.isRunning():
+            self.start()
 
     def run(self):
         try:
+            # Open Port
             self.serial_port = serial.Serial(self.port_name, self.baud_rate, timeout=0.1)
+            
+            # --- CRITICAL FIX: FORCE DTR/RTS ---
+            # Pico requires this to enable the USB CDC stack
+            self.serial_port.dtr = True
+            self.serial_port.rts = True
+            time.sleep(0.1) # Allow handshake to settle
+            
             self.is_running = True
             self.connection_status.emit(True)
+            
             while self.is_running:
                 if self.serial_port.in_waiting:
                     self.data_received.emit(self.serial_port.read(self.serial_port.in_waiting))
                 self.msleep(10)
+
         except Exception as e:
-            self.error_occurred.emit(str(e))
+            self.error_occurred.emit(f"Port Error: {str(e)}")
             self.connection_status.emit(False)
         finally:
             if self.serial_port and self.serial_port.is_open:
-                self.serial_port.close()
+                try:
+                    self.serial_port.close()
+                except: pass
 
     def send_data(self, data):
         if self.serial_port and self.serial_port.is_open:
@@ -160,6 +174,9 @@ class SerialWorker(QThread):
 
     def stop(self):
         self.is_running = False
+        if self.serial_port:
+            # Cancel I/O
+            self.serial_port.cancel_read()
         self.wait()
 
 # ==========================================
@@ -168,20 +185,18 @@ class SerialWorker(QThread):
 class PicoSigrokManager(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Pico Sigrok Manager")
+        self.setWindowTitle("Pico Sigrok Manager (Fixed Connection)")
         self.resize(950, 650)
 
-        # --- DATA WORKERS ---
         self.serial_worker = SerialWorker()
         self.serial_worker.data_received.connect(self.process_serial_data)
         self.serial_worker.connection_status.connect(self.update_connection_status)
+        self.serial_worker.error_occurred.connect(self.handle_serial_error)
 
-        # --- UI SETUP ---
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         self.main_layout = QVBoxLayout(central_widget)
 
-        # Tabs
         self.tabs = QTabWidget()
         self.main_layout.addWidget(self.tabs)
 
@@ -198,7 +213,7 @@ class PicoSigrokManager(QMainWindow):
     def setup_monitor_tab(self):
         layout = QVBoxLayout(self.tab_monitor)
         
-        # -- Connection --
+        # Connection
         grp_conn = QGroupBox("Connection")
         hbox = QHBoxLayout()
         self.port_combo = QComboBox()
@@ -215,11 +230,10 @@ class PicoSigrokManager(QMainWindow):
         grp_conn.setLayout(hbox)
         layout.addWidget(grp_conn)
         
-        # -- Channel Management --
+        # Channels
         grp_chan = QGroupBox("Channel Mapping & Control")
         vbox_chan = QVBoxLayout()
 
-        # Map Button
         hbox_map = QHBoxLayout()
         btn_map = QPushButton("Query Pin Mapping (n)")
         btn_map.setToolTip("Sends nD0-nD7 and nA0-nA1 to discover real Pin names")
@@ -227,7 +241,7 @@ class PicoSigrokManager(QMainWindow):
         hbox_map.addWidget(btn_map)
         vbox_chan.addLayout(hbox_map)
         
-        # Digital Toggles
+        # Digital D0-D7
         self.chk_dig = []
         hbox_d = QHBoxLayout()
         hbox_d.addWidget(QLabel("Digital:"))
@@ -238,11 +252,11 @@ class PicoSigrokManager(QMainWindow):
             self.chk_dig.append(chk)
         vbox_chan.addLayout(hbox_d)
 
-        # Analog Toggles (REDUCED TO 2 CHANNELS: A0, A1)
+        # Analog A0-A1 (ONLY 2 CHANNELS)
         self.chk_ana = []
         hbox_a = QHBoxLayout()
         hbox_a.addWidget(QLabel("Analog:"))
-        for i in range(2): # Changed from 3 to 2
+        for i in range(2):
             chk = QCheckBox(f"A{i}")
             chk.stateChanged.connect(lambda state, idx=i: self.send_cmd(f"A{'1' if state else '0'}{idx}"))
             hbox_a.addWidget(chk)
@@ -252,7 +266,7 @@ class PicoSigrokManager(QMainWindow):
         grp_chan.setLayout(vbox_chan)
         layout.addWidget(grp_chan)
 
-        # -- Operations --
+        # Operations
         grp_run = QGroupBox("Operations")
         hbox_run = QHBoxLayout()
         
@@ -268,18 +282,16 @@ class PicoSigrokManager(QMainWindow):
         grp_run.setLayout(hbox_run)
         layout.addWidget(grp_run)
 
-        # -- Logs --
+        # Logs
         split = QTabWidget()
         
         self.log_view = QTextEdit()
         self.log_view.setReadOnly(True)
-        # Dark Log Style
         self.log_view.setStyleSheet("background-color: #1e1e1e; color: #cfcfcf; font-family: Monospace; border: 1px solid #333;")
         split.addTab(self.log_view, "Protocol Log")
 
         self.map_view = QTextEdit()
         self.map_view.setReadOnly(True)
-        # Dark Map Style (Blueish text for data)
         self.map_view.setStyleSheet("background-color: #1e1e1e; color: #66a3ff; font-family: Monospace; border: 1px solid #333;")
         split.addTab(self.map_view, "Pin Map Results")
 
@@ -298,7 +310,7 @@ class PicoSigrokManager(QMainWindow):
         )
         layout.addWidget(lbl_instr)
         
-        # File Selection
+        # File
         file_layout = QHBoxLayout()
         self.lbl_file = QLabel("No file selected")
         self.lbl_file.setStyleSheet("border: 1px solid #444; padding: 5px; background: #2b2b2b; color: #fff;")
@@ -338,7 +350,7 @@ class PicoSigrokManager(QMainWindow):
         layout.addWidget(self.btn_upgrade)
 
     # ====================
-    # LOGIC HANDLERS
+    # LOGIC
     # ====================
     def refresh_ports(self):
         self.port_combo.clear()
@@ -351,6 +363,9 @@ class PicoSigrokManager(QMainWindow):
             if port:
                 self.serial_worker.connect_serial(port, 115200)
                 self.log(f"Connecting to {port}...")
+            else:
+                self.log("Error: No port selected.")
+                self.btn_connect.setChecked(False)
         else:
             self.serial_worker.stop()
             self.log("Disconnected.")
@@ -358,11 +373,19 @@ class PicoSigrokManager(QMainWindow):
     def update_connection_status(self, connected):
         self.btn_connect.setChecked(connected)
         self.btn_connect.setText("Disconnect" if connected else "Connect")
-        # Highlight connect button when active
         if connected:
             self.btn_connect.setStyleSheet("background-color: #2d5a35; color: #d4edda;")
+            # Auto-Identify on connect
+            QThread.msleep(100)
+            self.send_cmd("i")
         else:
             self.btn_connect.setStyleSheet("")
+
+    def handle_serial_error(self, msg):
+        self.log(msg)
+        self.btn_connect.setChecked(False)
+        self.btn_connect.setText("Connect")
+        self.btn_connect.setStyleSheet("")
 
     def send_cmd(self, cmd):
         self.log(f"TX: {cmd}")
@@ -371,12 +394,12 @@ class PicoSigrokManager(QMainWindow):
     def query_pin_names(self):
         self.map_view.clear()
         self.map_view.append("--- Querying Pin Map ---")
-        # Digital D0-D7
+        # D0-D7
         for i in range(8):
             self.send_cmd(f"nD{i}")
             time.sleep(0.05)
-        # Analog A0-A1 (REDUCED TO 2)
-        for i in range(2): 
+        # A0-A1
+        for i in range(2):
             self.send_cmd(f"nA{i}")
             time.sleep(0.05)
 
@@ -394,7 +417,7 @@ class PicoSigrokManager(QMainWindow):
         self.log_view.append(msg)
 
     # ====================
-    # FLASH HANDLERS
+    # FLASH
     # ====================
     def browse_firmware(self):
         fname, _ = QFileDialog.getOpenFileName(self, "Select Firmware", "", "UF2 Files (*.uf2)")
@@ -435,7 +458,7 @@ class PicoSigrokManager(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     
-    # --- DARK MODE THEME CONFIGURATION ---
+    # DARK THEME
     app.setStyle("Fusion")
     palette = QPalette()
     palette.setColor(QPalette.Window, QColor(53, 53, 53))
@@ -453,7 +476,6 @@ if __name__ == "__main__":
     palette.setColor(QPalette.HighlightedText, Qt.black)
     app.setPalette(palette)
     
-    # Apply generic tooltip styling
     app.setStyleSheet("QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }")
 
     window = PicoSigrokManager()
