@@ -5,15 +5,12 @@ import platform
 import serial
 print(f"DEBUG: Loaded serial from: {serial.__file__}")
 import serial.tools.list_ports
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QLabel, QComboBox, QPushButton, 
-                             QGroupBox, QCheckBox, QTextEdit, QTabWidget, 
-                             QGridLayout, QMessageBox, QFileDialog, QProgressBar)
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton, QGroupBox, QCheckBox, QTextEdit, QTabWidget, QGridLayout, QMessageBox, QFileDialog, QProgressBar)
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QPalette, QColor
 
 # ==========================================
-# 1. FLASHER WORKER (High Speed)
+# 1. FLASHER WORKER
 # ==========================================
 class FlasherWorker(QThread):
     status_update = pyqtSignal(str)
@@ -26,52 +23,35 @@ class FlasherWorker(QThread):
         self.is_running = True
 
     def find_pico_drive(self):
-        """Optimized OS-specific drive detector"""
         system = platform.system()
-        
         if system == "Windows":
             import string
             import ctypes
             drives = []
             bitmask = ctypes.windll.kernel32.GetLogicalDrives()
             for letter in string.ascii_uppercase:
-                if bitmask & 1:
-                    drives.append(f"{letter}:\\")
+                if bitmask & 1: drives.append(f"{letter}:\\")
                 bitmask >>= 1
-            
             for drive in drives:
-                if os.path.exists(os.path.join(drive, "INFO_UF2.TXT")):
-                    return drive
-                    
-        elif system == "Darwin": # macOS
-            if os.path.exists("/Volumes/RPI-RP2/INFO_UF2.TXT"):
-                return "/Volumes/RPI-RP2"
-                
+                if os.path.exists(os.path.join(drive, "INFO_UF2.TXT")): return drive
+        elif system == "Darwin":
+            if os.path.exists("/Volumes/RPI-RP2/INFO_UF2.TXT"): return "/Volumes/RPI-RP2"
         elif system == "Linux":
             user = os.environ.get('USER', 'root')
-            candidates = [
-                f"/media/{user}/RPI-RP2",
-                "/media/RPI-RP2",
-                "/mnt/RPI-RP2",
-                "/run/media/{user}/RPI-RP2"
-            ]
+            candidates = [f"/media/{user}/RPI-RP2", "/media/RPI-RP2", "/mnt/RPI-RP2", f"/run/media/{user}/RPI-RP2"]
             for path in candidates:
-                if os.path.exists(os.path.join(path, "INFO_UF2.TXT")):
-                    return path
+                if os.path.exists(os.path.join(path, "INFO_UF2.TXT")): return path
         return None
 
     def run(self):
         target_drive = None
         timeout = 30
-        poll_interval = 0.2 
+        poll_interval = 0.2
         elapsed = 0
-
         self.status_update.emit("Searching for RPI-RP2...")
-        
         while self.is_running and elapsed < timeout:
             target_drive = self.find_pico_drive()
-            if target_drive:
-                break
+            if target_drive: break
             time.sleep(poll_interval)
             elapsed += poll_interval
             self.progress_update.emit(int((elapsed / timeout) * 30))
@@ -81,14 +61,11 @@ class FlasherWorker(QThread):
             return
 
         self.status_update.emit(f"Flashing to {target_drive}...")
-        self.progress_update.emit(50)
-
         try:
             dest_path = os.path.join(target_drive, os.path.basename(self.source_file))
             file_size = os.path.getsize(self.source_file)
-            chunk_size = 64 * 1024 
+            chunk_size = 64 * 1024
             copied = 0
-            
             with open(self.source_file, 'rb') as fsrc:
                 with open(dest_path, 'wb') as fdst:
                     while True:
@@ -96,27 +73,15 @@ class FlasherWorker(QThread):
                         if not buf: break
                         fdst.write(buf)
                         copied += len(buf)
-                        pct = 50 + int((copied / file_size) * 50)
-                        self.progress_update.emit(pct)
-
-                    fdst.flush()
-                    os.fsync(fdst.fileno())
-            
-            self.progress_update.emit(100)
-            self.finished.emit(True, "Flash Complete (Device Rebooting)")
-
-        except OSError as e:
-            err_str = str(e)
-            if "No such device" in err_str or "Input/output error" in err_str or "Permission denied" in err_str:
-                 self.progress_update.emit(100)
-                 self.finished.emit(True, "Flash Complete (Device Disconnected Early)")
-            else:
-                self.finished.emit(False, f"Write Error: {err_str}")
+                        self.progress_update.emit(50 + int((copied / file_size) * 50))
+            fdst.flush()
+            os.fsync(fdst.fileno())
+            self.finished.emit(True, "Flash Complete")
         except Exception as e:
-            self.finished.emit(False, f"Unexpected Error: {str(e)}")
+            self.finished.emit(False, f"Error: {str(e)}")
 
 # ==========================================
-# 2. SERIAL WORKER (PATCHED)
+# 2. SERIAL WORKER
 # ==========================================
 class SerialWorker(QThread):
     data_received = pyqtSignal(bytes)
@@ -133,59 +98,43 @@ class SerialWorker(QThread):
     def connect_serial(self, port, baud):
         self.port_name = port
         self.baud_rate = baud
-        # Ensure we don't try to start if already running
-        if not self.isRunning():
-            self.start()
+        if not self.isRunning(): self.start()
 
     def run(self):
         try:
-            # Open Port
             self.serial_port = serial.Serial(self.port_name, self.baud_rate, timeout=0.1)
-            
-            # --- CRITICAL FIX: FORCE DTR/RTS ---
-            # Pico requires this to enable the USB CDC stack
             self.serial_port.dtr = True
             self.serial_port.rts = True
-            time.sleep(0.1) # Allow handshake to settle
-            
+            time.sleep(0.1)
             self.is_running = True
             self.connection_status.emit(True)
-            
             while self.is_running:
                 if self.serial_port.in_waiting:
                     self.data_received.emit(self.serial_port.read(self.serial_port.in_waiting))
                 self.msleep(10)
-
         except Exception as e:
             self.error_occurred.emit(f"Port Error: {str(e)}")
             self.connection_status.emit(False)
         finally:
-            if self.serial_port and self.serial_port.is_open:
-                try:
-                    self.serial_port.close()
-                except: pass
+            if self.serial_port and self.serial_port.is_open: self.serial_port.close()
 
     def send_data(self, data):
         if self.serial_port and self.serial_port.is_open:
-            try:
-                self.serial_port.write(data.encode('utf-8') + b'\n')
-            except Exception as e:
-                self.error_occurred.emit(str(e))
+            try: self.serial_port.write(data.encode('utf-8') + b'\n')
+            except Exception as e: self.error_occurred.emit(str(e))
 
     def stop(self):
         self.is_running = False
-        if self.serial_port:
-            # Cancel I/O
-            self.serial_port.cancel_read()
+        if self.serial_port: self.serial_port.cancel_read()
         self.wait()
 
 # ==========================================
-# 3. MAIN GUI (DARK MODE)
+# 3. MAIN GUI
 # ==========================================
 class PicoSigrokManager(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Pico Sigrok Manager (Fixed Connection)")
+        self.setWindowTitle("Pico Device Manager")
         self.resize(950, 650)
 
         self.serial_worker = SerialWorker()
@@ -212,8 +161,8 @@ class PicoSigrokManager(QMainWindow):
 
     def setup_monitor_tab(self):
         layout = QVBoxLayout(self.tab_monitor)
-        
-        # Connection
+
+        # Connection Group
         grp_conn = QGroupBox("Connection")
         hbox = QHBoxLayout()
         self.port_combo = QComboBox()
@@ -222,136 +171,98 @@ class PicoSigrokManager(QMainWindow):
         self.btn_connect = QPushButton("Connect")
         self.btn_connect.setCheckable(True)
         self.btn_connect.clicked.connect(self.toggle_connection)
-        
         hbox.addWidget(QLabel("Port:"))
         hbox.addWidget(self.port_combo)
         hbox.addWidget(btn_refresh)
         hbox.addWidget(self.btn_connect)
         grp_conn.setLayout(hbox)
         layout.addWidget(grp_conn)
-        
-        # Channels
-        grp_chan = QGroupBox("Channel Mapping & Control")
-        vbox_chan = QVBoxLayout()
 
-        hbox_map = QHBoxLayout()
+        # Operations Group
+        grp_ops = QGroupBox("Operations")
+        vbox_ops = QVBoxLayout()
+
+        # Row 1: Query Pin Mapping
         btn_map = QPushButton("Query Pin Mapping (n)")
-        btn_map.setToolTip("Sends nD0-nD7 and nA0-nA1 to discover real Pin names")
+        btn_map.setFixedHeight(35)
         btn_map.clicked.connect(self.query_pin_names)
-        hbox_map.addWidget(btn_map)
-        vbox_chan.addLayout(hbox_map)
-        
-        # Digital D0-D7
-        self.chk_dig = []
-        hbox_d = QHBoxLayout()
-        hbox_d.addWidget(QLabel("Digital:"))
-        for i in range(8):
-            chk = QCheckBox(f"D{i}")
-            chk.stateChanged.connect(lambda state, idx=i: self.send_cmd(f"D{'1' if state else '0'}{idx}"))
-            hbox_d.addWidget(chk)
-            self.chk_dig.append(chk)
-        vbox_chan.addLayout(hbox_d)
+        vbox_ops.addWidget(btn_map)
 
-        # Analog A0-A1 (ONLY 2 CHANNELS)
-        self.chk_ana = []
-        hbox_a = QHBoxLayout()
-        hbox_a.addWidget(QLabel("Analog:"))
-        for i in range(2):
-            chk = QCheckBox(f"A{i}")
-            chk.stateChanged.connect(lambda state, idx=i: self.send_cmd(f"A{'1' if state else '0'}{idx}"))
-            hbox_a.addWidget(chk)
-            self.chk_ana.append(chk)
-        vbox_chan.addLayout(hbox_a)
+        # Row 2: Identify, LED, Boot (Uniform sizes)
+        hbox_btns = QHBoxLayout()
+        btn_height = 40
 
-        grp_chan.setLayout(vbox_chan)
-        layout.addWidget(grp_chan)
+        self.btn_id = QPushButton("Identify")
+        self.btn_id.setFixedHeight(btn_height)
+        self.btn_id.clicked.connect(lambda: self.send_cmd("i"))
 
-        # Operations
-        grp_run = QGroupBox("Operations")
-        hbox_run = QHBoxLayout()
-        
-        btn_id = QPushButton("Identify (i)")
-        btn_id.clicked.connect(lambda: self.send_cmd("i"))
-        
-        btn_boot = QPushButton("Enter Bootloader (bootsel)")
-        btn_boot.setStyleSheet("background-color: #5a2e2e; color: #ffcccc; font-weight: bold; border: 1px solid #721c24;")
-        btn_boot.clicked.connect(self.trigger_bootsel)
+        self.btn_led = QPushButton("LED: OFF")
+        self.btn_led.setCheckable(True)
+        self.btn_led.setFixedHeight(btn_height)
+        self.btn_led.clicked.connect(self.toggle_led)
 
-        hbox_run.addWidget(btn_id)
-        hbox_run.addWidget(btn_boot)
-        grp_run.setLayout(hbox_run)
-        layout.addWidget(grp_run)
+        self.btn_boot = QPushButton("Boot")
+        self.btn_boot.setFixedHeight(btn_height)
+        self.btn_boot.setStyleSheet("background-color: #5a2e2e; color: #ffcccc; font-weight: bold;")
+        self.btn_boot.clicked.connect(self.trigger_bootsel)
+
+        hbox_btns.addWidget(self.btn_id)
+        hbox_btns.addWidget(self.btn_led)
+        hbox_btns.addWidget(self.btn_boot)
+
+        vbox_ops.addLayout(hbox_btns)
+        grp_ops.setLayout(vbox_ops)
+        layout.addWidget(grp_ops)
 
         # Logs
-        split = QTabWidget()
-        
+        split_tabs = QTabWidget()
         self.log_view = QTextEdit()
         self.log_view.setReadOnly(True)
-        self.log_view.setStyleSheet("background-color: #1e1e1e; color: #cfcfcf; font-family: Monospace; border: 1px solid #333;")
-        split.addTab(self.log_view, "Protocol Log")
+        self.log_view.setStyleSheet("background-color: #1e1e1e; color: #cfcfcf; font-family: Monospace;")
+        split_tabs.addTab(self.log_view, "Protocol Log")
 
         self.map_view = QTextEdit()
         self.map_view.setReadOnly(True)
-        self.map_view.setStyleSheet("background-color: #1e1e1e; color: #66a3ff; font-family: Monospace; border: 1px solid #333;")
-        split.addTab(self.map_view, "Pin Map Results")
+        self.map_view.setStyleSheet("background-color: #1e1e1e; color: #66a3ff; font-family: Monospace;")
+        split_tabs.addTab(self.map_view, "Pin Map Results")
 
-        layout.addWidget(split)
+        layout.addWidget(split_tabs)
 
     def setup_flash_tab(self):
         layout = QVBoxLayout(self.tab_flash)
-        
-        lbl_instr = QLabel(
-            "<h3 style='color: #fff;'>High-Speed Firmware Upgrade</h3>"
-            "<ol style='color: #ccc;'>"
-            "<li>Select <b>.uf2</b> file.</li>"
-            "<li>Click <b>Start Upgrade</b>.</li>"
-            "<li>Device reboots to 'RPI-RP2' drive.</li>"
-            "<li>File is copied instantly.</li></ol>"
-        )
-        layout.addWidget(lbl_instr)
-        
-        # File
+        layout.addWidget(QLabel("<h3>Firmware Upgrade</h3>"))
+
         file_layout = QHBoxLayout()
-        self.lbl_file = QLabel("No file selected")
-        self.lbl_file.setStyleSheet("border: 1px solid #444; padding: 5px; background: #2b2b2b; color: #fff;")
+        self.lbl_file = QLabel("No UF2 file selected")
+        self.lbl_file.setStyleSheet("border: 1px solid #444; padding: 5px; background: #2b2b2b;")
         btn_browse = QPushButton("Browse...")
         btn_browse.clicked.connect(self.browse_firmware)
         file_layout.addWidget(self.lbl_file, 1)
         file_layout.addWidget(btn_browse)
         layout.addLayout(file_layout)
-        
-        # Progress
+
         self.flash_progress = QProgressBar()
-        self.flash_progress.setStyleSheet("""
-            QProgressBar {
-                border: 1px solid #444;
-                border-radius: 4px;
-                background-color: #2b2b2b;
-                text-align: center;
-                color: white;
-            }
-            QProgressBar::chunk {
-                background-color: #2a82da;
-            }
-        """)
         layout.addWidget(self.flash_progress)
-        
-        # Log
         self.flash_log = QTextEdit()
         self.flash_log.setReadOnly(True)
-        self.flash_log.setStyleSheet("background-color: #1e1e1e; color: #0f0; font-family: Monospace;")
         layout.addWidget(self.flash_log)
-        
-        # Button
+
         self.btn_upgrade = QPushButton("Start Upgrade")
         self.btn_upgrade.setMinimumHeight(50)
-        self.btn_upgrade.setStyleSheet("background-color: #2a82da; color: white; font-weight: bold; font-size: 14px;")
+        self.btn_upgrade.setStyleSheet("background-color: #2a82da; color: white; font-weight: bold;")
         self.btn_upgrade.clicked.connect(self.start_upgrade)
         layout.addWidget(self.btn_upgrade)
 
-    # ====================
-    # LOGIC
-    # ====================
+    def toggle_led(self, checked):
+        if checked:
+            self.send_cmd("B1")
+            self.btn_led.setText("LED: ON")
+            self.btn_led.setStyleSheet("background-color: #ffd700; color: black; font-weight: bold;")
+        else:
+            self.send_cmd("B0")
+            self.btn_led.setText("LED: OFF")
+            self.btn_led.setStyleSheet("")
+
     def refresh_ports(self):
         self.port_combo.clear()
         for port in serial.tools.list_ports.comports():
@@ -360,65 +271,53 @@ class PicoSigrokManager(QMainWindow):
     def toggle_connection(self):
         if self.btn_connect.isChecked():
             port = self.port_combo.currentData()
-            if port:
-                self.serial_worker.connect_serial(port, 115200)
-                self.log(f"Connecting to {port}...")
-            else:
-                self.log("Error: No port selected.")
-                self.btn_connect.setChecked(False)
+            if port: self.serial_worker.connect_serial(port, 115200)
+            else: self.btn_connect.setChecked(False)
         else:
             self.serial_worker.stop()
-            self.log("Disconnected.")
 
     def update_connection_status(self, connected):
         self.btn_connect.setChecked(connected)
         self.btn_connect.setText("Disconnect" if connected else "Connect")
         if connected:
             self.btn_connect.setStyleSheet("background-color: #2d5a35; color: #d4edda;")
-            # Auto-Identify on connect
-            QThread.msleep(100)
             self.send_cmd("i")
         else:
             self.btn_connect.setStyleSheet("")
-
-    def handle_serial_error(self, msg):
-        self.log(msg)
-        self.btn_connect.setChecked(False)
-        self.btn_connect.setText("Connect")
-        self.btn_connect.setStyleSheet("")
-
-    def send_cmd(self, cmd):
-        self.log(f"TX: {cmd}")
-        self.serial_worker.send_data(cmd)
+            self.btn_led.setChecked(False)
+            self.btn_led.setText("LED: OFF")
+            self.btn_led.setStyleSheet("")
 
     def query_pin_names(self):
         self.map_view.clear()
         self.map_view.append("--- Querying Pin Map ---")
-        # D0-D7
+        # Digital
         for i in range(8):
             self.send_cmd(f"nD{i}")
-            time.sleep(0.05)
-        # A0-A1
+            time.sleep(0.02)
+        # Analog
         for i in range(2):
             self.send_cmd(f"nA{i}")
-            time.sleep(0.05)
+            time.sleep(0.02)
+
+    def handle_serial_error(self, msg):
+        self.log_view.append(f"Error: {msg}")
+        self.update_connection_status(False)
+
+    def send_cmd(self, cmd):
+        self.log_view.append(f"TX: {cmd}")
+        self.serial_worker.send_data(cmd)
 
     def process_serial_data(self, data):
         try:
             text = data.decode('utf-8').strip()
             if text:
+                self.log_view.append(f"RX: {text}")
+                # Filter Pin Map responses to the map tab
                 if text.startswith("GP") or "ADC" in text:
-                    self.map_view.append(f"RX: {text}")
-                self.log(f"RX: {text}")
-        except:
-            pass
+                    self.map_view.append(f"Pin Map -> {text}")
+        except: pass
 
-    def log(self, msg):
-        self.log_view.append(msg)
-
-    # ====================
-    # FLASH
-    # ====================
     def browse_firmware(self):
         fname, _ = QFileDialog.getOpenFileName(self, "Select Firmware", "", "UF2 Files (*.uf2)")
         if fname:
@@ -426,20 +325,17 @@ class PicoSigrokManager(QMainWindow):
             self.flash_path = fname
 
     def trigger_bootsel(self):
-        if QMessageBox.question(self, "Confirm", "Reboot to bootloader?") == QMessageBox.Yes:
+        if QMessageBox.question(self, "Confirm", "Reboot to Bootloader?") == QMessageBox.Yes:
             self.send_cmd("bootsel")
             self.serial_worker.stop()
 
     def start_upgrade(self):
-        if not hasattr(self, 'flash_path'):
-            QMessageBox.warning(self, "Error", "Select a file first.")
-            return
-        
+        if not hasattr(self, 'flash_path'): return
         if self.serial_worker.isRunning():
             self.send_cmd("bootsel")
             time.sleep(0.5)
             self.serial_worker.stop()
-        
+
         self.btn_upgrade.setEnabled(False)
         self.flasher = FlasherWorker(self.flash_path)
         self.flasher.status_update.connect(self.flash_log.append)
@@ -450,33 +346,19 @@ class PicoSigrokManager(QMainWindow):
     def on_flash_finished(self, success, msg):
         self.btn_upgrade.setEnabled(True)
         self.flash_log.append(msg)
-        if success:
-            QMessageBox.information(self, "Success", msg)
-        else:
-            QMessageBox.critical(self, "Error", msg)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    
-    # DARK THEME
     app.setStyle("Fusion")
     palette = QPalette()
     palette.setColor(QPalette.Window, QColor(53, 53, 53))
     palette.setColor(QPalette.WindowText, Qt.white)
     palette.setColor(QPalette.Base, QColor(25, 25, 25))
-    palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
-    palette.setColor(QPalette.ToolTipBase, Qt.black)
-    palette.setColor(QPalette.ToolTipText, Qt.white)
     palette.setColor(QPalette.Text, Qt.white)
     palette.setColor(QPalette.Button, QColor(53, 53, 53))
     palette.setColor(QPalette.ButtonText, Qt.white)
-    palette.setColor(QPalette.BrightText, Qt.red)
-    palette.setColor(QPalette.Link, QColor(42, 130, 218))
     palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
-    palette.setColor(QPalette.HighlightedText, Qt.black)
     app.setPalette(palette)
-    
-    app.setStyleSheet("QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }")
 
     window = PicoSigrokManager()
     window.show()

@@ -321,6 +321,19 @@ int process_char(sr_device_t *d, char charin)
             ret=0;
           }
           break;
+      case 'B':
+         tmpint = d->cmdstr[1];
+         if (tmpint == '1')
+         {
+            Dprintf("LED on\n");
+            gpio_put(LED_PIN, 1);
+         }
+         else if (tmpint == '0')
+         {
+            Dprintf("LED off\n");
+            gpio_put(LED_PIN, 0);
+         }
+
       default:
          Dprintf("bad command %s\n\r", d->cmdstr);
          ret = 0;
