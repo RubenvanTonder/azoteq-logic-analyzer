@@ -34,6 +34,7 @@ pico_sdk_init()
 add_executable(pico_sdk_sigrok
   pico_sdk_sigrok.c
   sr_device.c
+  pico_sdk_sigrok.h
 )
 
 pico_enable_stdio_usb(pico_sdk_sigrok 1)

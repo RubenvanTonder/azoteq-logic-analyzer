@@ -5,7 +5,7 @@ import platform
 import serial
 print(f"DEBUG: Loaded serial from: {serial.__file__}")
 import serial.tools.list_ports
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton, QGroupBox, QCheckBox, QTextEdit, QTabWidget, QGridLayout, QMessageBox, QFileDialog, QProgressBar)
+from PyQt5.QtWidgets import (QApplication, QLineEdit, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton, QGroupBox, QCheckBox, QTextEdit, QTabWidget, QGridLayout, QMessageBox, QFileDialog, QProgressBar)
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QPalette, QColor
 
@@ -231,19 +231,34 @@ class PicoSigrokManager(QMainWindow):
 
         # PWM Control Group
         grp_pwm = QGroupBox("PWM Control")
-        hbox_pwm = QHBoxLayout()
+        vbox_pwm = QVBoxLayout()
 
-        btn_pwm1 = QPushButton("PWM 1 (500kHz, 50%)")
+        # Inputs Row
+        hbox_inputs = QHBoxLayout()
+        self.txt_freq = QLineEdit("500") # Default 500 kHz
+        self.txt_duty = QLineEdit("20")  # Default 20 %
+
+        hbox_inputs.addWidget(QLabel("Freq (kHz):"))
+        hbox_inputs.addWidget(self.txt_freq)
+        hbox_inputs.addWidget(QLabel("Duty (%):"))
+        hbox_inputs.addWidget(self.txt_duty)
+        vbox_pwm.addLayout(hbox_inputs)
+
+        # Buttons Row
+        hbox_pwm_btns = QHBoxLayout()
+        btn_pwm1 = QPushButton("Update PWM 1")
         btn_pwm1.setFixedHeight(40)
         btn_pwm1.clicked.connect(lambda: self.send_pwm_cmd("1"))
 
-        btn_pwm2 = QPushButton("PWM 2 (500kHz, 20%)")
+        btn_pwm2 = QPushButton("Update PWM 2")
         btn_pwm2.setFixedHeight(40)
         btn_pwm2.clicked.connect(lambda: self.send_pwm_cmd("2"))
 
-        hbox_pwm.addWidget(btn_pwm1)
-        hbox_pwm.addWidget(btn_pwm2)
-        grp_pwm.setLayout(hbox_pwm)
+        hbox_pwm_btns.addWidget(btn_pwm1)
+        hbox_pwm_btns.addWidget(btn_pwm2)
+        vbox_pwm.addLayout(hbox_pwm_btns)
+
+        grp_pwm.setLayout(vbox_pwm)
         layout.addWidget(grp_pwm)
 
 
@@ -388,8 +403,12 @@ class PicoSigrokManager(QMainWindow):
             self.serial_worker.stop()
 
     def send_pwm_cmd(self, channel):
-        # Sends 'W1' or 'W2' based on the button clicked
-        cmd = f"W{channel}"
+        freq = self.txt_freq.text().strip()
+        duty = self.txt_duty.text().strip()
+
+        # Format: W<chan>,<freq_khz>,<duty_percent>
+        # Example: "W1,100,50"
+        cmd = f"W{channel},{freq},{duty}"
         self.send_cmd(cmd)
 
     def start_upgrade(self):

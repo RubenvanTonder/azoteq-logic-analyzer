@@ -334,15 +334,33 @@ int process_char(sr_device_t *d, char charin)
             gpio_put(LED_PIN, 0);
          }
       case 'W':
-         tmpint = d->cmdstr[1];
-         if (tmpint == '1')
-         {
-            update_pwm_frequency(PWM1, 500000, 0.5); // PWM1, 500000, 0.5
+      {
+         int channel = 0;
+         uint32_t freq_khz = 0;
+         float duty_input = 0.0f;
+
+         // Parse W<channel>,<freq>,<duty> from the accumulated cmdstr
+         // Example: "W1,100,50"
+         int items = sscanf(d->cmdstr, "W%d,%u,%f", &channel, &freq_khz, &duty_input);
+
+         if (items == 3) {
+            // Debug print
+            Dprintf("PWM Update: Ch:%d Freq:%uKHz Duty:%.1f%%\n", channel, freq_khz, duty_input);
+
+            // Convert units: kHz -> Hz, and Percent -> 0.0-1.0 float
+            uint32_t freq_hz = freq_khz * 1000;
+            float duty_decimal = duty_input / 100.0f;
+
+            // Map channel to specific Pins (Update PWM1/PWM2 to your actual GP numbers)
+            uint target_pin = (channel == 1) ? PWM1 : PWM2;
+
+            update_pwm_frequency(target_pin, freq_hz, duty_decimal);
+         } else {
+            Dprintf("Error: Invalid PWM format: %s\n", d->cmdstr);
+            d->rspstr[0] = '!'; // Error response
          }
-         else if (tmpint == '2')
-         {
-            update_pwm_frequency(PWM2, 500000, 0.2); // PWM2, 500000, 0.5
-         }
+         break;
+      }
 
       default:
          Dprintf("bad command %s\n\r", d->cmdstr);
