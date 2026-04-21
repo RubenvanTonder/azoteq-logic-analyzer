@@ -333,6 +333,16 @@ int process_char(sr_device_t *d, char charin)
             Dprintf("LED off\n");
             gpio_put(LED_PIN, 0);
          }
+      case 'W':
+         tmpint = d->cmdstr[1];
+         if (tmpint == '1')
+         {
+            update_pwm_frequency(PWM1, 500000, 0.5); // PWM1, 500000, 0.5
+         }
+         else if (tmpint == '2')
+         {
+            update_pwm_frequency(PWM2, 500000, 0.2); // PWM2, 500000, 0.5
+         }
 
       default:
          Dprintf("bad command %s\n\r", d->cmdstr);

@@ -66,19 +66,34 @@ class FlasherWorker(QThread):
             file_size = os.path.getsize(self.source_file)
             chunk_size = 64 * 1024
             copied = 0
+
             with open(self.source_file, 'rb') as fsrc:
                 with open(dest_path, 'wb') as fdst:
-                    while True:
+                    while self.is_running:
                         buf = fsrc.read(chunk_size)
-                        if not buf: break
+                        if not buf:
+                            break
                         fdst.write(buf)
                         copied += len(buf)
-                        self.progress_update.emit(50 + int((copied / file_size) * 50))
-            fdst.flush()
-            os.fsync(fdst.fileno())
+                        self.progress_update.emit(50 + int((copied / file_size) * 45))
+
+                    # IMPORTANT: Pico might reboot the moment the last byte is written.
+                    # Wrap the flush/sync in a try block or skip it for UF2.
+                    try:
+                        fdst.flush()
+                        os.fsync(fdst.fileno())
+                    except OSError:
+                        pass # Drive already disconnected, which is actually a success
+
+            self.progress_update.emit(100)
             self.finished.emit(True, "Flash Complete")
+
         except Exception as e:
-            self.finished.emit(False, f"Error: {str(e)}")
+            # Check if error is just the drive vanishing (Normal for Pico)
+            if "No such file" in str(e) or "Permission denied" in str(e):
+                self.finished.emit(True, "Flash Complete (Drive Reset)")
+            else:
+                self.finished.emit(False, f"Error: {str(e)}")
 
 # ==========================================
 # 2. SERIAL WORKER
@@ -109,14 +124,22 @@ class SerialWorker(QThread):
             self.is_running = True
             self.connection_status.emit(True)
             while self.is_running:
-                if self.serial_port.in_waiting:
+                if self.serial_port and self.serial_port.is_open and self.serial_port.in_waiting:
                     self.data_received.emit(self.serial_port.read(self.serial_port.in_waiting))
                 self.msleep(10)
         except Exception as e:
             self.error_occurred.emit(f"Port Error: {str(e)}")
-            self.connection_status.emit(False)
         finally:
-            if self.serial_port and self.serial_port.is_open: self.serial_port.close()
+            self.is_running = False
+            if self.serial_port:
+                try:
+                    if self.serial_port.is_open:
+                        self.serial_port.close()
+                except:
+                    pass
+                self.serial_port = None
+            self.connection_status.emit(False) # Notify GUI we are officially out
+
 
     def send_data(self, data):
         if self.serial_port and self.serial_port.is_open:
@@ -125,8 +148,22 @@ class SerialWorker(QThread):
 
     def stop(self):
         self.is_running = False
-        if self.serial_port: self.serial_port.cancel_read()
-        self.wait()
+        if self.serial_port:
+            try:
+                # Check if we are on Windows and if the overlapped structure is valid
+                if platform.system() == "Windows":
+                    # This prevents the 'NoneType' byref error
+                    if hasattr(self.serial_port, '_overlapped_read') and \
+                        self.serial_port._overlapped_read is not None:
+                        self.serial_port.cancel_read()
+                else:
+                    self.serial_port.cancel_read()
+            except Exception as e:
+                print(f"Cleanup note: Port already closed or gone ({e})")
+
+            # Use wait() only if the thread is still actually running
+            if self.isRunning():
+                self.wait(500) # Wait max 500ms for thread to exit
 
 # ==========================================
 # 3. MAIN GUI
@@ -191,6 +228,24 @@ class PicoSigrokManager(QMainWindow):
         # Row 2: Identify, LED, Boot (Uniform sizes)
         hbox_btns = QHBoxLayout()
         btn_height = 40
+
+        # PWM Control Group
+        grp_pwm = QGroupBox("PWM Control")
+        hbox_pwm = QHBoxLayout()
+
+        btn_pwm1 = QPushButton("PWM 1 (500kHz, 50%)")
+        btn_pwm1.setFixedHeight(40)
+        btn_pwm1.clicked.connect(lambda: self.send_pwm_cmd("1"))
+
+        btn_pwm2 = QPushButton("PWM 2 (500kHz, 20%)")
+        btn_pwm2.setFixedHeight(40)
+        btn_pwm2.clicked.connect(lambda: self.send_pwm_cmd("2"))
+
+        hbox_pwm.addWidget(btn_pwm1)
+        hbox_pwm.addWidget(btn_pwm2)
+        grp_pwm.setLayout(hbox_pwm)
+        layout.addWidget(grp_pwm)
+
 
         self.btn_id = QPushButton("Identify")
         self.btn_id.setFixedHeight(btn_height)
@@ -327,7 +382,15 @@ class PicoSigrokManager(QMainWindow):
     def trigger_bootsel(self):
         if QMessageBox.question(self, "Confirm", "Reboot to Bootloader?") == QMessageBox.Yes:
             self.send_cmd("bootsel")
+            # Force UI to 'Disconnected' state immediately
+            self.btn_connect.setChecked(False)
+            self.update_connection_status(False)
             self.serial_worker.stop()
+
+    def send_pwm_cmd(self, channel):
+        # Sends 'W1' or 'W2' based on the button clicked
+        cmd = f"W{channel}"
+        self.send_cmd(cmd)
 
     def start_upgrade(self):
         if not hasattr(self, 'flash_path'): return

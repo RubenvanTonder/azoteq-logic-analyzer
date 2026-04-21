@@ -48,6 +48,7 @@ target_link_libraries(
     hardware_dma
     hardware_pio
     hardware_sync
+    hardware_pwm
 #    hardware_sio
 #    hardware_gpio
 #    hardware_timer

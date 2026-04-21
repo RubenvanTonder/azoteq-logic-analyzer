@@ -2,6 +2,7 @@
 #define SR_DEVICE_H
 #include <stdint.h>
 #include <stdbool.h>
+#include "pico_sdk_sigrok.h"
 
 // Pin usages
 ///////////////////////////////////
@@ -42,6 +43,7 @@
 #if PICO_MODE == 0 // Digital 8, Analog 2, PWM 2 (Only supports RP2354)
   #define BASE_MODE 1
   #define AZO_MODE 1
+  #define PWM 1
   #define NUM_A_CHAN 2 // number of analog channels
   #define NUM_D_CHAN 8 // number of digital channels
     //Note: GPIO_D_MASK is relative to the pins of the chip, whereas the
@@ -56,6 +58,8 @@
   #define LED_PIN 25
   #define ADC1 41
   #define ADC2 42
+  #define PWM1 12
+  #define PWM2 13
   #define D1 2
   #define D2 3
   #define D3 4
