@@ -788,18 +788,32 @@ int main(){
     gpio_set_function(PWM2,GPIO_FUNC_PWM);
 
     // 2. Find out which PWM slice is connected to that GPIO
-    uint slice_num = pwm_gpio_to_slice_num(PWM1);
+    uint slice_num1 = pwm_gpio_to_slice_num(PWM1);
 
     // 3. Set the 'wrap' value (the maximum count before resetting to 0)
     // 65535 gives 16-bit resolution.
-    pwm_set_wrap(slice_num, 65535);
+    pwm_set_wrap(slice_num1, 65535);
 
     // 4. (Optional) Set clock divider to adjust frequency
     // Default sys_clk is 125MHz (RP2040) or 150MHz (RP2350).
-    pwm_set_clkdiv(slice_num, 4.0f);
+    pwm_set_clkdiv(slice_num1, 4.0f);
 
     // 5. Start the PWM slice
-    pwm_set_enabled(slice_num, true);
+    pwm_set_enabled(slice_num1, true);
+
+    // 2. Find out which PWM slice is connected to that GPIO
+    uint slice_num2 = pwm_gpio_to_slice_num(PWM2);
+
+    // 3. Set the 'wrap' value (the maximum count before resetting to 0)
+    // 65535 gives 16-bit resolution.
+    pwm_set_wrap(slice_num2, 65535);
+
+    // 4. (Optional) Set clock divider to adjust frequency
+    // Default sys_clk is 125MHz (RP2040) or 150MHz (RP2350).
+    pwm_set_clkdiv(slice_num2, 1.0f);
+
+    // 5. Start the PWM slice
+    pwm_set_enabled(slice_num2, true);
 
     #endif
 
@@ -1407,31 +1421,28 @@ void set_pwm_level(uint gpio, uint16_t level)
 
 /* Function to set the frequency of the PWM signals (changes duty cycle the same)*/
 // might implement it in order to cahnge frequency only and not duty cycle as well
-void update_pwm_frequency(uint pin, uint32_t freq_hz, float duty_percent)
-{
+void update_pwm_frequency(uint pin, uint32_t freq_hz, float duty_percent) {
     uint slice_num = pwm_gpio_to_slice_num(pin);
     uint32_t sys_clk = clock_get_hz(clk_sys);
 
-    // 1. Get a default config
-    pwm_config config = pwm_get_default_config();
+    // 1. DYNAMICALLY calculate wrap to avoid fixed pulse widths
+    // A lower frequency needs a higher wrap; a higher frequency needs a lower wrap.
+    uint32_t wrap = (sys_clk / (2 * freq_hz)) - 1;
+    if (wrap > 65535) wrap = 65535;
 
-    // 2. Calculate values
-    uint32_t wrap = 65534; // Use even number for phase-correct
-    float div = (float)sys_clk / (freq_hz * (wrap + 1) * 2); // *2 for phase-correct
+    // 2. Calculate the divider based on the new wrap
+    float div = (float)sys_clk / (freq_hz * (wrap + 1) * 2);
+    if (div < 1.0f) div = 1.0f; // Hardware floor
 
-    // 3. Setup the config object
-    pwm_config_set_clkdiv(&config, div);
-    pwm_config_set_wrap(&config, wrap);
-    pwm_config_set_phase_correct(&config, true);
-
-    // 4. Apply the configuration to the hardware
-    // This updates the registers but the hardware latches them at the next wrap
-    pwm_init(slice_num, &config, true);
-
-    // 5. Update the level (duty cycle)
+    // 3. Calculate new level (pulse width) relative to NEW wrap
     uint32_t level = (uint32_t)(duty_percent * (wrap + 1));
-    pwm_set_gpio_level(pin, level);
+
+    // 4. Apply everything
+    pwm_set_clkdiv(slice_num, div);
+    pwm_set_wrap(slice_num, wrap);
+    pwm_set_chan_level(slice_num, pwm_gpio_to_channel(pin), level);
 }
+
 
 //Depracated trigger logic
 //This HW based trigger which should be part of send slices was tested enough to confirm the
