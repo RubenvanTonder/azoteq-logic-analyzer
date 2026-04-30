@@ -59,7 +59,7 @@
   #define ADC1 41
   #define ADC2 42
   #define PWM1 12
-  #define PWM2 14
+  #define PWM2 13
   #define D1 2
   #define D2 3
   #define D3 4
