@@ -68,6 +68,8 @@
   #define D6 7
   #define D7 8
   #define D8 9
+  #define DIR 14
+  #define NOT_OE 15
 #elif PICO_MODE == 1  //Digital 26
   #define DIG_26_MODE 1
   #define NUM_A_CHAN 0 // number of analog channels

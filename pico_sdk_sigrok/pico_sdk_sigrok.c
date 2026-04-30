@@ -817,6 +817,12 @@ int main(){
 
     #endif
 
+    // Enable direction control for SN74LVC8
+    gpio_set_dir(DIR, true);
+    gpio_set_dir(NOT_OE, true);
+    gpio_put(DIR,true);
+    gpio_put(NOT_OE, false);
+
     halves_seen=0;
 
     admachan0 = dma_claim_unused_channel(true);
