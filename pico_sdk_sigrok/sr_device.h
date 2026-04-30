@@ -29,18 +29,15 @@
 // Note: In the wireless versions, GPIO23-25 control the wifi chip, 23 and 24
 //aren't available in the PICO, and 25 controls the LED. So while the LED is lost,
 //there is no change in available channels for sampling.
-#define PICO_MODE 0 //0 is baseline, 1 is digital 26, 2 is digital 32, 3 is Azoteq Logic Analyzer
-#define PICO_RP2350 1
 //WARNING: USE PIN_TEST_MODE with extreme caution!!!!
 //If set, treat the inputs (A&D) to be outputs so that the device can drive values for
 //turn-on testing.  Enabling this allows all modes to be tested without having to drive
 //test patterns on the chip.  But it turns what are normally inputs to outputs and thus
 //can cause drive fights if any drivers are connected.
-//#define PIN_TEST_MODE 1
-#undef BASE_MODE
-#undef DIG_26_MODE
-#undef DIG_32_MODE
-#undef HAS_LED
+// //#define PIN_TEST_MODE 1
+// #undef BASE_MODE
+// #undef DIG_26_MODE
+// #undef DIG_32_MODE
 //These two enable debug print outs of D4 generation, D4_DBG2 is higher verbosity
 //#define D4_DBG 1
 //#define D4_DBG2 2

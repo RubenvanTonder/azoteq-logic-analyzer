@@ -698,26 +698,21 @@ bool pin_test_timer_callback(__unused struct repeating_timer *t){
   }
   return true;
 }
-void core1_entry(){
-    Dprintf("*********WARNING PIN TEST MODE-DO NOT CONNECT TO PINS\n\r");
-    gpio_init_mask(PIN_TEST_MASK); //set to function SIO as input
-    //Note the pin directions are handled in the timer call back.
-    //gpio_set_dir_masked(PIN_TEST_MASK,PIN_TEST_MASK); //masked set per pin.  1 is output, 0 is input
-    //                     delay in us, call back,      userdata, timer
-    add_repeating_timer_us(100,pin_test_timer_callback,NULL,&pt_timer);
-    gpio_set_dir_masked(PIN_TEST_MASK,PIN_TEST_MASK); //masked set per pin.  1 is output, 0 is input
-    Dprintf("Pin Test Mode Timer Added\n\r");
-    while(1){
-      //Attempt to sleep the core to reduce contention for the memory bus
-      //and maybe save some power
-        __wfe();
-    }
-  }//core1_entry
-
 #endif //PIN_TEST_MODE
 int main(){
     int delay=100;
     stdio_usb_init();
+    // 1. Attempt to set clock to 250,000 kHz (250 MHz)
+    // The 'true' parameter tells it to adjust the voltage (VREG) automatically.
+    if (!set_sys_clock_khz(250000, true)) {
+        // If it returns false, the frequency is not supported by the current crystal
+        // or the PLL cannot find a valid integer divider.
+        while (1); 
+    }
+
+    // 2. Re-initialize peripherals that depend on the system clock
+    stdio_init_all();
+    // Optional: Re-run your frequency count code to verify
     #if (UART_EN == 1)
      uart_set_format(uart0,8,1,0);
      uart_init(uart0,UART_BAUD);
@@ -782,7 +777,7 @@ int main(){
     #endif
 
     //Initialize PWM pins
-    #ifdef PWM
+    #ifdef PWM1
     // 1. Choose the GPIO pin
     gpio_set_function(PWM1,GPIO_FUNC_PWM);
     gpio_set_function(PWM2,GPIO_FUNC_PWM);

@@ -31,18 +31,25 @@ set(CMAKE_CXX_STANDARD 17)
 #setting this allows the DTR to be ignored.  In addition to this, the use of
 #tud_cdc_connected should be replaced with tud_ready.
 add_definitions(-DPICO_STDIO_USB_CONNECTION_WITHOUT_DTR=1)
+
+
 pico_sdk_init()
 
 add_executable(pico_sdk_sigrok
   pico_sdk_sigrok.c
   sr_device.c
   pico_sdk_sigrok.h
+  AZP1524A1.h
 )
 
 pico_enable_stdio_usb(pico_sdk_sigrok 1)
 pico_enable_stdio_uart(pico_sdk_sigrok 0)
 
 pico_add_extra_outputs(pico_sdk_sigrok)
+
+target_compile_definitions(pico_sdk_sigrok PRIVATE
+    PICO_USE_PSRAM=1
+)
 
 target_link_libraries(
     pico_sdk_sigrok
@@ -57,4 +64,5 @@ target_link_libraries(
 #    hardware_timer
     pico_multicore
     pico_stdio_usb
+    pico_runtime_init    # <--- This contains psram_found and psram_size_bytes
 )

@@ -10,7 +10,7 @@
 #ifndef AZP1524A1
 #define AZP1524A1
 
-#define BASE_MODE 1
+#define BASE_MODE 0
 #define PICO_MODE 0
 #define AZO_MODE 1
 #define NUM_A_CHAN 2 // number of analog channels
