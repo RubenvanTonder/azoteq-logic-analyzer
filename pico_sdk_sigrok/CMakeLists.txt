@@ -4,13 +4,15 @@ if(WIN32)
 else()
     set(USERHOME $ENV{HOME})
 endif()
-set(sdkVersion 2.1.1)
-set(toolchainVersion 13_3_Rel1)
-set(picotoolVersion 2.1.1)
+set(picotool_DIR "C:/Pico/tools/picotool")
+set(sdkVersion 2.2.0)
+set(toolchainVersion 14_2_Rel1)
+set(picotoolVersion 2.2.0 )
 set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
 if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
+
 # ====================================================================================
 # 1. Set the Board
 set(PICO_BOARD pico2 CACHE STRING "Board type")

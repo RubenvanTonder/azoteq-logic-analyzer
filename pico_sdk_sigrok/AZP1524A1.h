@@ -11,6 +11,7 @@
 #define AZP1524A1
 
 #define BASE_MODE 1
+#define PICO_MODE 0
 #define AZO_MODE 1
 #define NUM_A_CHAN 2 // number of analog channels
 #define NUM_D_CHAN 8 // number of digital channels
@@ -40,7 +41,15 @@
 #define D7 8
 #define D8 9
 
+// Level shifter control pins
+#define DIR 14
+#define NOT_OE 15
+
+// PWM Pins
+#define PWM1 12
+#define PWM2 13
+
 // RP2350
-#define PICO_RP2350
+#define PICO_RP2350 1
 
 #endif /* AZP1524A1*/

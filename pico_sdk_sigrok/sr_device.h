@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "pico_sdk_sigrok.h"
+#include "AZP1524A1.h"
 
 // Pin usages
 ///////////////////////////////////
@@ -40,60 +41,6 @@
 #undef DIG_26_MODE
 #undef DIG_32_MODE
 #undef HAS_LED
-#if PICO_MODE == 0 // Digital 8, Analog 2, PWM 2 (Only supports RP2354)
-  #define BASE_MODE 1
-  #define AZO_MODE 1
-  #define PWM 1
-  #define NUM_A_CHAN 2 // number of analog channels
-  #define NUM_D_CHAN 8 // number of digital channels
-    //Note: GPIO_D_MASK is relative to the pins of the chip, whereas the
-  //MEM_D_MASK is relative to the value written in memory, those may be different depending
-  //on how data is shifted from the GPIOs into memory.
-  #define GPIO_D_MASK 0x0003FC  //Mask of bits for digital inputs
-  #define UART_EN 1
-  #define MEM_D_MASK_L 0x3FC  //lower mask of bits for digital inputs
-  #define MEM_D_MASK_U 0x0  //upper mask of bits for digital inputs
-  #define PIN_TEST_MASK 0x001FFC
-  #define HAS_LED 1
-  #define LED_PIN 25
-  #define ADC1 41
-  #define ADC2 42
-  #define PWM1 12
-  #define PWM2 13
-  #define D1 2
-  #define D2 3
-  #define D3 4
-  #define D4 5
-  #define D5 6
-  #define D6 7
-  #define D7 8
-  #define D8 9
-  #define DIR 14
-  #define NOT_OE 15
-#elif PICO_MODE == 1  //Digital 26
-  #define DIG_26_MODE 1
-  #define NUM_A_CHAN 0 // number of analog channels
-  #define NUM_D_CHAN 26 // number of digital channels
-  #define GPIO_D_MASK 0x1C7FFFFF  //Mask of bits for digital inputs
-  #define MEM_D_MASK_L 0x007FFFFF  //lower mask of bits for digital inputs
-  #define MEM_D_MASK_U 0x1C000000  //upper mask of bits for digital inputs
-  #define UART_EN 0
-  #define PIN_TEST_MASK 0x1C7FFFFF
-  #define HAS_LED 1
-//Note: The RP2040 only has GPIOs 0-29.
-//The RP2350 has GPIOs 30 and above, but only in the QFN-80 packeage.
-#elif PICO_MODE==2  //Digital 32
- // #define BASE_MODE 0
- // #define DIG_26_MODE 0
-  #define DIG_32_MODE 1
-  #define NUM_A_CHAN 0 // number of analog channels
-  #define NUM_D_CHAN 32 // number of digital channels
-  #define GPIO_D_MASK   0xFFFFFFFF  //Mask of bits for digital inputs
-  #define MEM_D_MASK_L 0xFFFFFFFF  //lower mask of bits for digital inputs
-  #define MEM_D_MASK_U 0x00000000  //upper mask of bits for digital inputs
-  #define UART_EN 0
-  #define PIN_TEST_MASK 0xFFFFFFFF
-#endif
 //These two enable debug print outs of D4 generation, D4_DBG2 is higher verbosity
 //#define D4_DBG 1
 //#define D4_DBG2 2
