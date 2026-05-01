@@ -717,6 +717,16 @@ int main(){
     // 3. Re-init standard I/O (important if using UART/USB)
     stdio_init_all();
 
+    #include "hardware/clocks.h"
+
+  // After setting sys_clk to 400MHz+
+  clock_configure(clk_adc,
+                  0, // No glitchless mux
+                  CLOCKS_CLK_ADC_CTRL_AUXSRC_VALUE_CLKSRC_PLL_USB, // Use USB PLL (usually stays 48MHz)
+                  48 * MHZ,
+                  48 * MHZ);
+
+
     // Optional: Re-run your frequency count code to verify
     #if (UART_EN == 1)
      uart_set_format(uart0,8,1,0);
@@ -1073,18 +1083,23 @@ while(1){
           //         ,dev.d_nps,dev.a_chan_cnt,dev.d_size,dev.a_size,dev.a_mask);
           Dprintf("start offsets d0 0x%X d1 0x%X a0 0x%X a1 0x%X samperhalf %u\n\r"
               ,dev.dbuf0_start,dev.dbuf1_start,dev.abuf0_start,dev.abuf1_start,dev.samples_per_half);
-//For debug clear out initial values, but not needed in normal operation
-//          for(uint32_t x=0;x<DMA_BUF_SIZE;x++){
-//            capture_buf[x]=0x12;
-//          }
-#ifdef PIN_TEST_MODE
-          for(uint32_t x=0;x<SYSTICK_SIZE;x++){
-            systick_array[x]=0x0;
-          }
-          systick_idx=0;
-#endif //PIN_TEST_MODE
+          //For debug clear out initial values, but not needed in normal operation
+          //          for(uint32_t x=0;x<DMA_BUF_SIZE;x++){
+          //            capture_buf[x]=0x12;
+          //          }
+          #ifdef PIN_TEST_MODE
+                    for(uint32_t x=0;x<SYSTICK_SIZE;x++){
+                      systick_array[x]=0x0;
+                    }
+                    systick_idx=0;
+          #endif //PIN_TEST_MODE
           //Dprintf("starting data buf values 0x%X 0x%X\n\r",capture_buf[dev.dbuf0_start],capture_buf[dev.dbuf1_start]);
-          uint32_t adcdivint=48000000ULL/(dev.sample_rate*dev.a_chan_cnt);
+          // Dynamically fetch the clock speed instead of assuming 48MHz
+          uint32_t current_adc_hz = clock_get_hz(clk_adc);
+          uint32_t adcdivint = current_adc_hz / (dev.sample_rate * dev.a_chan_cnt);
+
+          // Apply the divider to the hardware register
+          adc_set_clkdiv((float)adcdivint);   
           if(dev.a_chan_cnt){
       	     adc_run(false);
              //             en, dreq_en,dreq_thresh,err_in_fifo,byte_shift to 8 bit
@@ -1104,7 +1119,8 @@ while(1){
              //Fractional divisors should generally be avoided because it creates
              //skew with digital samples.
              uint8_t adc_frac_int;
-             adc_frac_int=(uint8_t)(((48000000ULL%dev.sample_rate)*256ULL)/dev.sample_rate);
+              uint32_t current_adc_hz = clock_get_hz(clk_adc); // Get real clock speed (likely 48M or 60M)
+              adc_frac_int = (uint8_t)((( (uint64_t)current_adc_hz % dev.sample_rate) * 256ULL) / dev.sample_rate);
              if(adcdivint<=96){
                Dprintf("adcdivint of %d below 96, aborting\n\r",adcdivint);
                dev.state=ABORTED;
@@ -1143,20 +1159,20 @@ while(1){
              //Due to how PIO shifts in bits, if any digital channel within a group of 8 is set,
              //then all groups below it must also be set. We further restrict it in the tx_init function
              //by saying digital channel usage must be continous.
- /* pin count is restricted to 4,8,16 or 32, and pin count of 4 is only used
-Pin count is kept to a powers of 2 so that we always read a sample with a single byte/word/dword read
-for faster parsing.
-   if analog is disabled and we are in D4 mode
-    bits d_dma_bps   d_tx_bps
-    0-4    0          1        No analog channels
-    0-4    1          1        1 or more analog channels
-    5-7    1          1
-    8      1          2
-    9-12   2          2
-    13-14  2          2
-    15-16  2          3
-    17-21  4          3
-*/
+              /* pin count is restricted to 4,8,16 or 32, and pin count of 4 is only used
+              Pin count is kept to a powers of 2 so that we always read a sample with a single byte/word/dword read
+              for faster parsing.
+                if analog is disabled and we are in D4 mode
+                  bits d_dma_bps   d_tx_bps
+                  0-4    0          1        No analog channels
+                  0-4    1          1        1 or more analog channels
+                  5-7    1          1
+                  8      1          2
+                  9-12   2          2
+                  13-14  2          2
+                  15-16  2          3
+                  17-21  4          3
+              */
              dev.pin_count=0 ;
              if(dev.d_mask&0x0000000F) dev.pin_count+=4;
              if(dev.d_mask&0x000000F0) dev.pin_count+=4;
