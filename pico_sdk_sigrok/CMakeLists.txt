@@ -59,6 +59,8 @@ target_link_libraries(
     hardware_pio
     hardware_sync
     hardware_pwm
+    hardware_vreg
+    hardware_clocks
 #    hardware_sio
 #    hardware_gpio
 #    hardware_timer

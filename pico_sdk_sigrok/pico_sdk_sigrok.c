@@ -5,6 +5,7 @@
  */
 #include "pico_sdk_sigrok.h"
 #include "sr_device.h"
+#include "hardware/vreg.h"
 
 //forced_test_mode is a special mode that puts the device into an active sampling
 //state out of reset.  It is used for a quick way to debug features without needed
@@ -702,16 +703,20 @@ bool pin_test_timer_callback(__unused struct repeating_timer *t){
 int main(){
     int delay=100;
     stdio_usb_init();
-    // 1. Attempt to set clock to 250,000 kHz (250 MHz)
-    // The 'true' parameter tells it to adjust the voltage (VREG) automatically.
-    if (!set_sys_clock_khz(250000, true)) {
-        // If it returns false, the frequency is not supported by the current crystal
-        // or the PLL cannot find a valid integer divider.
-        while (1); 
+
+    // 1. Boost voltage for stability at high speeds (e.g., 1.30V)
+    vreg_set_voltage(VREG_VOLTAGE_1_30);
+    sleep_ms(10);
+
+    // 2. Set Clock to 400 MHz (400,000 kHz)
+    // The RP2350 architecture handles this much better than the RP2040
+    if (!set_sys_clock_khz(300000, true)) {
+       while(1);
     }
 
-    // 2. Re-initialize peripherals that depend on the system clock
+    // 3. Re-init standard I/O (important if using UART/USB)
     stdio_init_all();
+
     // Optional: Re-run your frequency count code to verify
     #if (UART_EN == 1)
      uart_set_format(uart0,8,1,0);
