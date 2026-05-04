@@ -16,6 +16,7 @@
 #include "pico/multicore.h"
 #include "tusb.h"//.tud_cdc_write...
 #include "hardware/pwm.h"
+#include "hardware/vreg.h"
 
 /* Function to set the duty cycle of the PWM signals*/
 void set_pwm_level(uint gpio, uint16_t level);

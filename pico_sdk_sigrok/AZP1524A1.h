@@ -1,7 +1,7 @@
 /******************************************************************************
  * File Name: AZP1524A1.h
  * Description:  H-file for PCB version AZP1524A1
- * Author: Ruben van Tonder     
+ * Author: Ruben van Tonder
  * Your NameDate: 2026-04-30
  * Version: 1.0
  * Copyright (c) 2026 Your Azoteq. All rights reserved.
@@ -48,6 +48,7 @@
 // PWM Pins
 #define PWM1 12
 #define PWM2 13
+#define PWM 1
 
 // RP2350
 #define PICO_RP2350 1

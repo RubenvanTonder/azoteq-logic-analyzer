@@ -5,7 +5,6 @@
  */
 #include "pico_sdk_sigrok.h"
 #include "sr_device.h"
-#include "hardware/vreg.h"
 
 //forced_test_mode is a special mode that puts the device into an active sampling
 //state out of reset.  It is used for a quick way to debug features without needed
@@ -699,6 +698,22 @@ bool pin_test_timer_callback(__unused struct repeating_timer *t){
   }
   return true;
 }
+void core1_entry(){
+    Dprintf("*********WARNING PIN TEST MODE-DO NOT CONNECT TO PINS\n\r");
+    gpio_init_mask(PIN_TEST_MASK); //set to function SIO as input
+    //Note the pin directions are handled in the timer call back.
+    //gpio_set_dir_masked(PIN_TEST_MASK,PIN_TEST_MASK); //masked set per pin.  1 is output, 0 is input
+    //                     delay in us, call back,      userdata, timer
+    add_repeating_timer_us(100,pin_test_timer_callback,NULL,&pt_timer);
+    gpio_set_dir_masked(PIN_TEST_MASK,PIN_TEST_MASK); //masked set per pin.  1 is output, 0 is input
+    Dprintf("Pin Test Mode Timer Added\n\r");
+    while(1){
+      //Attempt to sleep the core to reduce contention for the memory bus
+      //and maybe save some power
+        __wfe();
+    }
+  }//core1_entry
+
 #endif //PIN_TEST_MODE
 int main(){
     int delay=100;
@@ -710,14 +725,12 @@ int main(){
 
     // 2. Set Clock to 400 MHz (400,000 kHz)
     // The RP2350 architecture handles this much better than the RP2040
-    if (!set_sys_clock_khz(300000, true)) {
+    if (!set_sys_clock_khz(200000, true)) {
        while(1);
     }
 
     // 3. Re-init standard I/O (important if using UART/USB)
     stdio_init_all();
-
-    #include "hardware/clocks.h"
 
   // After setting sys_clk to 400MHz+
   clock_configure(clk_adc,
@@ -792,7 +805,7 @@ int main(){
     #endif
 
     //Initialize PWM pins
-    #ifdef PWM1
+    #ifdef PWM
     // 1. Choose the GPIO pin
     gpio_set_function(PWM1,GPIO_FUNC_PWM);
     gpio_set_function(PWM2,GPIO_FUNC_PWM);
@@ -1083,23 +1096,20 @@ while(1){
           //         ,dev.d_nps,dev.a_chan_cnt,dev.d_size,dev.a_size,dev.a_mask);
           Dprintf("start offsets d0 0x%X d1 0x%X a0 0x%X a1 0x%X samperhalf %u\n\r"
               ,dev.dbuf0_start,dev.dbuf1_start,dev.abuf0_start,dev.abuf1_start,dev.samples_per_half);
-          //For debug clear out initial values, but not needed in normal operation
-          //          for(uint32_t x=0;x<DMA_BUF_SIZE;x++){
-          //            capture_buf[x]=0x12;
-          //          }
-          #ifdef PIN_TEST_MODE
-                    for(uint32_t x=0;x<SYSTICK_SIZE;x++){
-                      systick_array[x]=0x0;
-                    }
-                    systick_idx=0;
-          #endif //PIN_TEST_MODE
+//For debug clear out initial values, but not needed in normal operation
+//          for(uint32_t x=0;x<DMA_BUF_SIZE;x++){
+//            capture_buf[x]=0x12;
+//          }
+#ifdef PIN_TEST_MODE
+          for(uint32_t x=0;x<SYSTICK_SIZE;x++){
+            systick_array[x]=0x0;
+          }
+          systick_idx=0;
+#endif //PIN_TEST_MODE
           //Dprintf("starting data buf values 0x%X 0x%X\n\r",capture_buf[dev.dbuf0_start],capture_buf[dev.dbuf1_start]);
-          // Dynamically fetch the clock speed instead of assuming 48MHz
-          uint32_t current_adc_hz = clock_get_hz(clk_adc);
-          uint32_t adcdivint = current_adc_hz / (dev.sample_rate * dev.a_chan_cnt);
-
-          // Apply the divider to the hardware register
-          adc_set_clkdiv((float)adcdivint);   
+          // Using the standard 48MHz clock for RP2350
+          int target_rate = dev.sample_rate * dev.a_chan_cnt;
+          int div = (200000000.0f / target_rate) - 1.0f;
           if(dev.a_chan_cnt){
       	     adc_run(false);
              //             en, dreq_en,dreq_thresh,err_in_fifo,byte_shift to 8 bit
@@ -1119,16 +1129,15 @@ while(1){
              //Fractional divisors should generally be avoided because it creates
              //skew with digital samples.
              uint8_t adc_frac_int;
-              uint32_t current_adc_hz = clock_get_hz(clk_adc); // Get real clock speed (likely 48M or 60M)
-              adc_frac_int = (uint8_t)((( (uint64_t)current_adc_hz % dev.sample_rate) * 256ULL) / dev.sample_rate);
-             if(adcdivint<=96){
-               Dprintf("adcdivint of %d below 96, aborting\n\r",adcdivint);
+             adc_frac_int=(uint8_t)(((200000000ULL %dev.sample_rate)*256ULL)/dev.sample_rate);
+             if(div<=96){
+               Dprintf("adcdivint of %d below 96, aborting\n\r",div);
                dev.state=ABORTED;
                adc_aborting=true;
                *adcdiv=0;
              }else{ //adcdivint legal
-	              *adcdiv=((adcdivint-1)<<8)|adc_frac_int;
-                Dprintf("adcdiv %u frac %d adcdivint %d\n\r",*adcdiv,adc_frac_int,adcdivint);
+	              *adcdiv=((div-1)<<8)|adc_frac_int;
+                Dprintf("adcdiv %u frac %d adcdivint %d\n\r",*adcdiv,adc_frac_int,div);
                 //This is needed to clear the AINSEL so that when the round robin arbiter starts
                 //we start sampling on channel 0
                 adc_select_input(0);
@@ -1159,20 +1168,20 @@ while(1){
              //Due to how PIO shifts in bits, if any digital channel within a group of 8 is set,
              //then all groups below it must also be set. We further restrict it in the tx_init function
              //by saying digital channel usage must be continous.
-              /* pin count is restricted to 4,8,16 or 32, and pin count of 4 is only used
-              Pin count is kept to a powers of 2 so that we always read a sample with a single byte/word/dword read
-              for faster parsing.
-                if analog is disabled and we are in D4 mode
-                  bits d_dma_bps   d_tx_bps
-                  0-4    0          1        No analog channels
-                  0-4    1          1        1 or more analog channels
-                  5-7    1          1
-                  8      1          2
-                  9-12   2          2
-                  13-14  2          2
-                  15-16  2          3
-                  17-21  4          3
-              */
+ /* pin count is restricted to 4,8,16 or 32, and pin count of 4 is only used
+Pin count is kept to a powers of 2 so that we always read a sample with a single byte/word/dword read
+for faster parsing.
+   if analog is disabled and we are in D4 mode
+    bits d_dma_bps   d_tx_bps
+    0-4    0          1        No analog channels
+    0-4    1          1        1 or more analog channels
+    5-7    1          1
+    8      1          2
+    9-12   2          2
+    13-14  2          2
+    15-16  2          3
+    17-21  4          3
+*/
              dev.pin_count=0 ;
              if(dev.d_mask&0x0000000F) dev.pin_count+=4;
              if(dev.d_mask&0x000000F0) dev.pin_count+=4;
