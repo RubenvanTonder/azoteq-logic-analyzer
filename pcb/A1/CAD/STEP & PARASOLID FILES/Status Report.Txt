@@ -1,0 +1,10 @@
+Output: TESTPOINT_TEST JIG DXF OUTPUT
+Type  : AutoCAD PCB
+From  : PCB Document [DT_AZP1524A1_PCB1_00A.PcbDoc]
+   Generated File[DT_AZP1524A1_PCB1_00A.DXF]
+
+
+Files Generated   : 1
+Documents Printed : 0
+
+Finished Output Generation At 10:01:43 On 2026/04/16
