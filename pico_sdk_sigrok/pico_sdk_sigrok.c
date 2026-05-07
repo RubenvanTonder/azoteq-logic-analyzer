@@ -776,6 +776,10 @@ int main(){
     //Note that digital only modes don't block all configuration related to ADC, but does enough
     //to ensure we can properly sample the pins digitally.
     #ifdef BASE_MODE /*RP2354 Only*/
+    gpio_disable_pulls(41); // Clear leakage/bias on GP41
+    gpio_disable_pulls(42); // Clear leakage/bias on GP42
+    gpio_set_input_enabled(41, false); // Disable the digital input buffer
+    gpio_set_input_enabled(42, false); // Disable the digital input buffer
     adc_gpio_init(41); //41
     adc_gpio_init(42); //42
     // adc_gpio_init(28); not used
