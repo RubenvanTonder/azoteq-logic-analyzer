@@ -1087,7 +1087,7 @@ while(1){
           //Dprintf("starting data buf values 0x%X 0x%X\n\r",capture_buf[dev.dbuf0_start],capture_buf[dev.dbuf1_start]);
           // Using the standard 125MHz clock for RP2350
           int target_rate = dev.sample_rate * dev.a_chan_cnt;
-          int adcdivint = (125000000ULL / target_rate) - 1.0f;
+          int adcdivint = (clock_get_hz(clk_adc) / target_rate) - 1.0f;
           if(dev.a_chan_cnt){
       	     adc_run(false);
              //             en, dreq_en,dreq_thresh,err_in_fifo,byte_shift to 8 bit
@@ -1107,7 +1107,7 @@ while(1){
              //Fractional divisors should generally be avoided because it creates
              //skew with digital samples.
              uint8_t adc_frac_int;
-             adc_frac_int=(uint8_t)(((125000000ULL%dev.sample_rate)*256ULL)/dev.sample_rate);
+             adc_frac_int=(uint8_t)(((clock_get_hz(clk_adc)%dev.sample_rate)*256ULL)/dev.sample_rate);
              if(adcdivint<=96){
                Dprintf("adcdivint of %d below 96, aborting\n\r",adcdivint);
                dev.state=ABORTED;
