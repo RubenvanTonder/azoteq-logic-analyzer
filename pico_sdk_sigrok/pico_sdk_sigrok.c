@@ -960,7 +960,7 @@ while(1){
               dev.cont=false;
               //These must start from 0 and go up.
               dev.d_mask=0xF;
-              dev.a_mask=0x1;
+              dev.a_mask=0x6;
              //min 5khz sample rate
              //TODO (ADC)-Need to add support for ADC clocking/overclocking
              //- setting to 1MHZ seems to break if ADC is enabled .
@@ -1041,7 +1041,8 @@ while(1){
            //Give dig and analog equal fractions
            //This is the size of each half buffer in bytes
            dev.d_size=(buff_chunks*chunk_size*d_nibbles)/(t_nibbles*2);
-           dev.a_size=(buff_chunks*chunk_size*a_nibbles)/(t_nibbles*2);
+           // 2 adc channels so multiply by 2
+           dev.a_size=2*(buff_chunks*chunk_size*a_nibbles)/(t_nibbles*2);
            dev.samples_per_half=chunk_samples*buff_chunks/2;
            exp_halves=dev.cont ? -1 : dev.num_samples/dev.samples_per_half;
            if(dev.cont==false && (dev.num_samples%dev.samples_per_half)) exp_halves++;
@@ -1116,10 +1117,19 @@ while(1){
              }else{ //adcdivint legal
 	              *adcdiv=((adcdivint-1)<<8)|adc_frac_int;
                 Dprintf("adcdiv %u frac %d adcdivint %d\n\r",*adcdiv,adc_frac_int,adcdivint);
-                //This is needed to clear the AINSEL so that when the round robin arbiter starts
-                //we start sampling on channel 0
-                adc_select_input(0);
-                adc_set_round_robin(dev.a_mask & 0x7);
+                // 1. Stop any running ADC
+                adc_run(false);
+
+                // 2. Clear the FIFO completely
+                adc_fifo_drain();
+
+                // 3. Set the starting channel to the LOWEST bit in your mask
+                // If using GP41 (Ch1) and GP42 (Ch2), use 1.
+                adc_select_input(1);
+
+                // 4. Re-apply the Round Robin mask
+                adc_set_round_robin(0x6);
+
                 //             en, dreq_en,dreq_thresh,err_in_fifo,byte_shift to 8 bit
                 adc_fifo_setup(true, true,   1,           false,       true);
                 //set adc0 to immediate trigger (but without adc_run it shouldn't start)
@@ -1138,6 +1148,8 @@ while(1){
                 //                      channel, config, write_addr,            read_addr,transfer_count,trigger)
                 dma_channel_configure(amaintchan0,&amcfg0, (uint32_t *) tmpaddr0,&amaddrs[0]  ,1,false);
                 dma_channel_configure(amaintchan1,&amcfg1, (uint32_t *) tmpaddr1,&amaddrs[1]  ,1,false);
+                // 6. Finally, start the ADC
+                adc_run(true);
                 adc_fifo_drain();
               } //adcdivint legal
           }//any analog enabled
