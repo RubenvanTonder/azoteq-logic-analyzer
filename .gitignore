@@ -3,6 +3,7 @@
 **/.vscode/c_cpp_properties.json
 **/.vscode/launch.json
 **/build/**
+**/pico_sdk_sigrok/build/**
 
 # Except the following files
 !*.uf2

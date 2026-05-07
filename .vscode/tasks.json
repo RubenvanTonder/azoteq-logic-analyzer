@@ -1,0 +1,33 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "CMake: Configure (Pico 2)",
+            "type": "shell",
+            "command": "cmake -G Ninja -DPICO_BOARD=pico2 -DPICO_PLATFORM=rp2350-arm-s -S ./pico_sdk_sigrok -B ./pico_sdk_sigrok/build",
+            "group": "none",
+            "problemMatcher": [],
+            "detail": "Configures Pico 2 project inside the subfolder."
+        },
+        {
+          "label": "CMake: Build & Show %",
+          "type": "shell",
+          "command": "cmake --build ./pico_sdk_sigrok/build ; $elf='./pico_sdk_sigrok/build/pico_sdk_sigrok.elf' ; if (Test-Path $elf) { $stats = arm-none-eabi-size $elf | Select-String -Pattern '\\d+' ; $vals = [regex]::Matches($stats, '\\d+') | % { [int]$_.Value } ; $f_pct = [math]::Round(($vals[0] / 16MB) * 100, 2) ; $r_pct = [math]::Round(($vals[1] / 520KB) * 100, 2) ; Write-Host '--- Usage Summary ---' -ForegroundColor Cyan ; Write-Host ('Flash: {0} bytes ({1}%) of 16MB' -f $vals[0], $f_pct) ; Write-Host ('SRAM:  {0} bytes ({1}%) of 520KB' -f $vals[1], $r_pct) }",
+          "group": {
+              "kind": "build",
+              "isDefault": true
+          },
+          "problemMatcher": "$gcc"
+        },
+        {
+            "label": "CMake: Clean",
+            "type": "shell",
+            "command": "ninja -C ./pico_sdk_sigrok/build clean",
+            "group": "none",
+            "problemMatcher": []
+        },
+
+
+
+    ]
+}
