@@ -1,14 +1,14 @@
 # 🔬 Logic Analyzer Test & Validation Report
 
-**Device Name:**
-**Model / Variant:**
-**Firmware / Software Version:**
-**Date Tested:**
-**Engineer:**
+**Device Name:** Azoteq Logic Analyzer
+**Model / Variant:** 8 Digital + 2 Analog + 1 PWM
+**Firmware / Software Version:** FW v1.0 / PulseView 0.4.2
+**Date Tested:** 08/05/2026
+**Engineer:** Ruben van Tonder
 
 ---
 
-# ⏱️ Sampling & Frequency Tests
+# ⏱️ Signal Generator Test
 
 ## Maximum Sampling Rate (Buffer)
 - **Test Setup:**
@@ -18,36 +18,67 @@
   - Sample Rate: 200MSa/s
 
 - **Procedure:**
-  -
+  - Set CH1 to as high as possible frequency while a perfect square wave can be measured on the oscilloscope
 
 - **Expected Behavior:**
-  -
+  - Measure the specified signal on the oscilloscope without distortion
 
 - **Observed Results:**
-  -
+  - A Square wave of 2 MHz is the maximum frequency the signal generator can generate and be without significant distortion
 
-- **Validation Outcome:** ✅ / ⚠️ / ❌
+- **Validation Outcome:** ⚠️
 - **Notes:**
+  - Note maximum 2MHz square/pulse waveforms should be used in the test
 
+---
+
+---
+
+# ⏱️ Sampling & Frequency Tests
+
+## Maximum Sampling Rate (Buffer)
+- **Test Setup:**
+  - Signal Source: Seesii DDS Signal Generator
+  - Frequency Tested: 5MHz
+  - Channels Used: 2 channels
+  - Sample Rate: 120MSa/s
+
+- **Procedure:**
+  - Set CH1 to as high as possible frequency while a perfect square wave can be measured on the logic analyzer
+
+- **Expected Behavior:**
+  - Measure the specified signal on the logic analyzer without distortion
+
+- **Observed Results:**
+  -Observed stable 5MHz square wave when sampling at 100MHz. Distortion occures at higher frequency square waves but not due to sampling rate but due to signal generator rise/fall times
+- **Validation Outcome:** ✅
+- **Notes:**
+  - Can succesfully measure up to 120MHz
+
+![Sampling Rate](Photos/Sampling%20Rate.png)
 ---
 
 ## Minimum Detectable Pulse Width
 - **Test Setup:**
-  - Signal Generator:
-  - Pulse Width Range:
+  - Signal Generator: SeeSii 60MHz
+  - Pulse Width Range: 200ns (5MHz)
 
 - **Procedure:**
-  -
+  - Set Signal geneator to 3.3V 5MHz with a starting duty cycle of 50%, gradually decrease duty cycle until signal no longer be sampling accurately. Then repeat the test by decrease the frequency at starting at 50% duty cycle again.
 
 - **Expected Behavior:**
-  -
+  - Measure the pulse width until it gets to small it start distorting or is missed by the logic analyzer
 
 - **Observed Results:**
-  -
+  - The logic analyzer is capable of measure up to a minimum pulse width of 17ns
 
-- **Validation Outcome:** ✅ / ⚠️ / ❌
+- **Validation Outcome:** ✅
 - **Notes:**
+  - Pulse Width > 17ns reliable
+  - Pulse Width < 17ns intermittent
 
+  ![Minimum Pulse Width](Photos/17ns.png)
+  ![Below Minimum Pulse Width](Photos/below17ns.png)
 ---
 
 # ⏱️ Timing Accuracy & Jitter
