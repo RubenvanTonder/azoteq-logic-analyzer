@@ -353,6 +353,6 @@
 ---
 
 # 📁 Attachments
-- Waveform Screenshots:
+- Waveform Screenshots: Photos
 - Logs:
 - Raw Capture Files:
