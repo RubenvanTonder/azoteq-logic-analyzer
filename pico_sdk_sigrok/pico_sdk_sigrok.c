@@ -718,28 +718,6 @@ void core1_entry(){
 int main(){
     int delay=100;
     stdio_usb_init();
-
-    // 1. Boost voltage for stability at high speeds (e.g., 1.30V)
-    vreg_set_voltage(VREG_VOLTAGE_1_30);
-    sleep_ms(10);
-
-    // 2. Set Clock to 400 MHz (400,000 kHz)
-    // The RP2350 architecture handles this much better than the RP2040
-    if (!set_sys_clock_khz(200000, true)) {
-       while(1);
-    }
-
-    // 3. Re-init standard I/O (important if using UART/USB)
-    stdio_init_all();
-
-  // After setting sys_clk to 400MHz+
-  clock_configure(clk_adc,
-                  0, // No glitchless mux
-                  CLOCKS_CLK_ADC_CTRL_AUXSRC_VALUE_CLKSRC_PLL_USB, // Use USB PLL (usually stays 48MHz)
-                  48 * MHZ,
-                  48 * MHZ);
-
-
     // Optional: Re-run your frequency count code to verify
     #if (UART_EN == 1)
      uart_set_format(uart0,8,1,0);
@@ -798,6 +776,10 @@ int main(){
     //Note that digital only modes don't block all configuration related to ADC, but does enough
     //to ensure we can properly sample the pins digitally.
     #ifdef BASE_MODE /*RP2354 Only*/
+    gpio_disable_pulls(41); // Clear leakage/bias on GP41
+    gpio_disable_pulls(42); // Clear leakage/bias on GP42
+    gpio_set_input_enabled(41, false); // Disable the digital input buffer
+    gpio_set_input_enabled(42, false); // Disable the digital input buffer
     adc_gpio_init(41); //41
     adc_gpio_init(42); //42
     // adc_gpio_init(28); not used
@@ -982,7 +964,7 @@ while(1){
               dev.cont=false;
               //These must start from 0 and go up.
               dev.d_mask=0xF;
-              dev.a_mask=0x1;
+              dev.a_mask=0x6;
              //min 5khz sample rate
              //TODO (ADC)-Need to add support for ADC clocking/overclocking
              //- setting to 1MHZ seems to break if ADC is enabled .
@@ -1063,7 +1045,8 @@ while(1){
            //Give dig and analog equal fractions
            //This is the size of each half buffer in bytes
            dev.d_size=(buff_chunks*chunk_size*d_nibbles)/(t_nibbles*2);
-           dev.a_size=(buff_chunks*chunk_size*a_nibbles)/(t_nibbles*2);
+           // 2 adc channels so multiply by 2
+           dev.a_size=2*(buff_chunks*chunk_size*a_nibbles)/(t_nibbles*2);
            dev.samples_per_half=chunk_samples*buff_chunks/2;
            exp_halves=dev.cont ? -1 : dev.num_samples/dev.samples_per_half;
            if(dev.cont==false && (dev.num_samples%dev.samples_per_half)) exp_halves++;
@@ -1107,9 +1090,9 @@ while(1){
           systick_idx=0;
 #endif //PIN_TEST_MODE
           //Dprintf("starting data buf values 0x%X 0x%X\n\r",capture_buf[dev.dbuf0_start],capture_buf[dev.dbuf1_start]);
-          // Using the standard 48MHz clock for RP2350
+          // Using the standard 125MHz clock for RP2350
           int target_rate = dev.sample_rate * dev.a_chan_cnt;
-          int div = (200000000.0f / target_rate) - 1.0f;
+          int adcdivint = (clock_get_hz(clk_adc) / target_rate) - 1.0f;
           if(dev.a_chan_cnt){
       	     adc_run(false);
              //             en, dreq_en,dreq_thresh,err_in_fifo,byte_shift to 8 bit
@@ -1129,19 +1112,28 @@ while(1){
              //Fractional divisors should generally be avoided because it creates
              //skew with digital samples.
              uint8_t adc_frac_int;
-             adc_frac_int=(uint8_t)(((200000000ULL %dev.sample_rate)*256ULL)/dev.sample_rate);
-             if(div<=96){
-               Dprintf("adcdivint of %d below 96, aborting\n\r",div);
+             adc_frac_int=(uint8_t)(((clock_get_hz(clk_adc)%dev.sample_rate)*256ULL)/dev.sample_rate);
+             if(adcdivint<=96){
+               Dprintf("adcdivint of %d below 96, aborting\n\r",adcdivint);
                dev.state=ABORTED;
                adc_aborting=true;
                *adcdiv=0;
              }else{ //adcdivint legal
-	              *adcdiv=((div-1)<<8)|adc_frac_int;
-                Dprintf("adcdiv %u frac %d adcdivint %d\n\r",*adcdiv,adc_frac_int,div);
-                //This is needed to clear the AINSEL so that when the round robin arbiter starts
-                //we start sampling on channel 0
-                adc_select_input(0);
-                adc_set_round_robin(dev.a_mask & 0x7);
+	              *adcdiv=((adcdivint-1)<<8)|adc_frac_int;
+                Dprintf("adcdiv %u frac %d adcdivint %d\n\r",*adcdiv,adc_frac_int,adcdivint);
+                // 1. Stop any running ADC
+                adc_run(false);
+
+                // 2. Clear the FIFO completely
+                adc_fifo_drain();
+
+                // 3. Set the starting channel to the LOWEST bit in your mask
+                // If using GP41 (Ch1) and GP42 (Ch2), use 1.
+                adc_select_input(1);
+
+                // 4. Re-apply the Round Robin mask
+                adc_set_round_robin(0x6);
+
                 //             en, dreq_en,dreq_thresh,err_in_fifo,byte_shift to 8 bit
                 adc_fifo_setup(true, true,   1,           false,       true);
                 //set adc0 to immediate trigger (but without adc_run it shouldn't start)
@@ -1160,6 +1152,8 @@ while(1){
                 //                      channel, config, write_addr,            read_addr,transfer_count,trigger)
                 dma_channel_configure(amaintchan0,&amcfg0, (uint32_t *) tmpaddr0,&amaddrs[0]  ,1,false);
                 dma_channel_configure(amaintchan1,&amcfg1, (uint32_t *) tmpaddr1,&amaddrs[1]  ,1,false);
+                // 6. Finally, start the ADC
+                adc_run(true);
                 adc_fifo_drain();
               } //adcdivint legal
           }//any analog enabled
