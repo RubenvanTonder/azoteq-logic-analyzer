@@ -1,0 +1,10 @@
+Output: DRC
+Type  : DRC
+From  : PCB Document [DT_AZP1524A1_PCB1_00A.PcbDoc]
+   Generated File[DT_AZP1524A1_PCB1_00A.html]
+
+
+Files Generated   : 1
+Documents Printed : 0
+
+Finished Output Generation At 09:55:09 On 2026/04/16

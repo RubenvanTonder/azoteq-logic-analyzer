@@ -1,0 +1,11 @@
+Output: BOMCOST - XML BOM
+Type  : BOM
+From  : Project [AZP1524A1.PrjPCB]
+   Generated File[BOMCOST - XML BOM-AZP1524A1.xml]
+   Generated File[BOMCOST - XML BOM-AZP1524A1.xsl]
+
+
+Files Generated   : 2
+Documents Printed : 0
+
+Finished Output Generation At 10:01:38 On 2026/04/16
