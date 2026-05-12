@@ -1132,7 +1132,7 @@ while(1){
                 adc_select_input(1);
 
                 // 4. Re-apply the Round Robin mask
-                adc_set_round_robin(0x6);
+                adc_set_round_robin(0x2);
 
                 //             en, dreq_en,dreq_thresh,err_in_fifo,byte_shift to 8 bit
                 adc_fifo_setup(true, true,   1,           false,       true);
